@@ -1,0 +1,17 @@
+.pin-row{padding:12px 0}
+.pin-row .pin-row-head{align-items:center;gap:8px}
+.pin-row .pin-row-icon{padding:8px;flex:none}
+.pin-row .pin-row-info{min-width:0}
+.pin-row h2{font-size:14px;line-height:1.4;margin:0 0 4px;overflow-wrap:anywhere}
+.pin-row .pin-row-info>p{line-height:1.5}
+.pin-row .pin-author{margin:0;flex:none}
+.pin-row .pin-author .avatar{width:44px;height:44px;min-height:44px;padding:0;margin:0;font-size:12px}
+.pin-row .pin-row-description{margin:4px 0;font-size:12px;line-height:1.5;white-space:pre-wrap}
+.pin-row-footer{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:8px;margin-top:4px}
+.pin-row-actions{display:flex;align-items:center;gap:4px}
+.pin-row .pin-row-actions button{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;padding:4px;margin:0;font-size:12px;white-space:nowrap}
+.pin-row .landmark-feedback{min-width:0;margin:0;padding:0;border:0}
+.pin-row .landmark-feedback>div{gap:4px;margin:0}
+.pin-row .landmark-feedback button{min-width:0;min-height:44px;gap:4px;padding:4px!important;font-size:11px!important}
+.pin-row .landmark-feedback svg{width:14px;height:14px}
+.pin-row .landmark-feedback b{font-weight:500;font-variant-numeric:tabular-nums}
