@@ -19,3 +19,5 @@
 .profile-stats{margin-bottom:8px}
 .profile-stats-note{margin:0 28px 24px;color:var(--muted);font-size:11px;line-height:1.7}
 @media(max-width:700px){.profile-stats-note{margin:0 20px 16px}}
+.profile-wall-card .profile-history-remove{color:var(--muted);margin-left:8px;min-height:44px}
+.profile-history-note{display:block;margin-top:8px;color:var(--muted);font-size:11px;line-height:1.7}

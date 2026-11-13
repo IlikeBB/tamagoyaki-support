@@ -1,6 +1,16 @@
 {
   "announcements": [
     {
+      "id": "wall-history-removal-20261113",
+      "type": "update",
+      "published_at": "2026-11-13",
+      "title": "整理自己的遠征隊牆",
+      "body": [
+        "個人檔案的遠征隊牆新增「移除紀錄」，可移除自己已退出或已解散的場次卡片。",
+        "移除只更新自己的展示牆與牆上計數；其他隊員的紀錄與地標評價各自保留。重新加入同一遠征隊時，該場次會重新顯示。"
+      ]
+    },
+    {
       "id": "landmark-repair-20261113",
       "type": "update",
       "published_at": "2026-11-13",

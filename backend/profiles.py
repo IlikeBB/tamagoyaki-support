@@ -26,6 +26,11 @@ class Profiles:
               id TEXT PRIMARY KEY,owner TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
               name TEXT NOT NULL,venue TEXT NOT NULL,event_date TEXT NOT NULL,discoverable INTEGER NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS profile_wall_removals (
+              user TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              expedition TEXT NOT NULL REFERENCES expedition_records(id) ON DELETE CASCADE,
+              removed INTEGER NOT NULL,PRIMARY KEY(user,expedition)
+            );
             ''')
             c.execute('BEGIN IMMEDIATE')
             c.execute('''INSERT OR IGNORE INTO expedition_records
@@ -52,6 +57,7 @@ class Profiles:
     def joined(c,uid,eid):
         stamp=int(time.time())
         Profiles.archive_room(c,eid)
+        c.execute('DELETE FROM profile_wall_removals WHERE user=? AND expedition=?',(uid,eid))
         c.execute('''INSERT INTO expedition_history VALUES(?,?,?,?) ON CONFLICT(user,expedition)
           DO UPDATE SET last_joined=excluded.last_joined''',(uid,eid,stamp,stamp))
 
@@ -67,16 +73,19 @@ class Profiles:
     def wall(self,c,uid,viewer,offset=0):
         # Public room cards reveal only fields already in the public catalogue.
         clause='''FROM expedition_history h JOIN expedition_records e ON e.id=h.expedition
-          WHERE h.user=? AND (?=? OR e.discoverable=1 OR EXISTS(
+          WHERE h.user=? AND NOT EXISTS(SELECT 1 FROM profile_wall_removals r
+            WHERE r.user=h.user AND r.expedition=h.expedition)
+          AND (?=? OR e.discoverable=1 OR EXISTS(
             SELECT 1 FROM members m WHERE m.user=? AND m.expedition=e.id))'''
         params=(uid,uid,viewer,viewer)
         total=c.execute('SELECT COUNT(*) '+clause,params).fetchone()[0]
         rows=[dict(r) for r in c.execute('''SELECT e.id,e.name,e.venue,e.event_date,
           NOT EXISTS(SELECT 1 FROM expeditions live WHERE live.id=e.id) AS removed,
           (e.owner=? AND EXISTS(SELECT 1 FROM expeditions live WHERE live.id=e.id)) AS can_delete,
+          (?=h.user AND NOT EXISTS(SELECT 1 FROM members m WHERE m.user=h.user AND m.expedition=e.id)) AS can_remove,
           EXISTS(SELECT 1 FROM members m WHERE m.user=h.user AND m.expedition=e.id) AS participating,
           EXISTS(SELECT 1 FROM members m WHERE m.user=? AND m.expedition=e.id) AS can_enter '''+clause+
-          ' ORDER BY e.event_date DESC,h.last_joined DESC,e.id LIMIT 12 OFFSET ?',(viewer,viewer,*params,offset))]
+          ' ORDER BY e.event_date DESC,h.last_joined DESC,e.id LIMIT 12 OFFSET ?',(viewer,viewer,viewer,*params,offset))]
         for row in rows:
             row['venue_name']=next((v['name'] for v in self.venues if v['id']==row['venue']),row['venue'])
         return {'items':rows,'total':total,'next_offset':offset+len(rows) if offset+len(rows)<total else None}
@@ -105,6 +114,18 @@ class Profiles:
             with self.connect() as c:
                 c.execute('BEGIN');self.target(c,uid)
                 return self.wall(c,uid,viewer,offset)
+
+        @app.delete('/api/profiles/me/wall/{eid}')
+        def remove_wall_record(eid: str,request: Request):
+            uid=self.accounts.current_user(request)['id']
+            with self.connect() as c:
+                c.execute('BEGIN IMMEDIATE')
+                if not c.execute('SELECT 1 FROM expedition_history WHERE user=? AND expedition=?',(uid,eid)).fetchone():
+                    raise HTTPException(404,'找不到你的這筆遠征紀錄。')
+                if c.execute('SELECT 1 FROM members WHERE user=? AND expedition=?',(uid,eid)).fetchone():
+                    raise HTTPException(409,'請先退出這支遠征隊，再移除牆上紀錄。')
+                c.execute('INSERT OR IGNORE INTO profile_wall_removals VALUES(?,?,?)',(uid,eid,int(time.time())))
+            return {'ok':True}
 
         @app.get('/api/profiles/{uid}/feedback')
         def feedback(uid: str,request: Request,kind: Literal['received','given']='received',offset: int=Query(default=0,ge=0)):

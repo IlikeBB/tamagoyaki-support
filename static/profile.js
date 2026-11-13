@@ -2,7 +2,7 @@
 class ProfileClient {
   constructor(root,actions){
     this.root=root;this.actions=actions;this.owner=null;this.generation=0;this.recordRequest=0;this.tab='wall';this.items=[];this.editing=false;
-    this.view=new ProfileView(root,{tab:tab=>this.selectTab(tab),more:()=>this.records(true),photo:slot=>this.pick(slot),room:id=>this.navigate(()=>actions.room(id)),removeRoom:id=>this.navigate(()=>actions.removeRoom(id)),pin:(eid,pid)=>this.navigate(()=>actions.pin(eid,pid)),withdraw:(eid,pid)=>this.withdraw(eid,pid),edit:()=>this.edit(),settings:()=>this.navigate(actions.settings),save:form=>this.save(form),closed:()=>this.closed(),removeAvatar:()=>this.remove('avatar'),removeBanner:()=>this.remove('banner')});
+    this.view=new ProfileView(root,{tab:tab=>this.selectTab(tab),more:()=>this.records(true),photo:slot=>this.pick(slot),room:id=>this.navigate(()=>actions.room(id)),removeRoom:id=>this.navigate(()=>actions.removeRoom(id)),removeHistory:id=>this.removeHistory(id),historyBusy:()=>this.historyRemoval?.id,pin:(eid,pid)=>this.navigate(()=>actions.pin(eid,pid)),withdraw:(eid,pid)=>this.withdraw(eid,pid),edit:()=>this.edit(),settings:()=>this.navigate(actions.settings),save:form=>this.save(form),closed:()=>this.closed(),removeAvatar:()=>this.remove('avatar'),removeBanner:()=>this.remove('banner')});
     this.crop=new ProfileCrop(root.querySelector('#profile-crop'),{opened:()=>{this.view.scroll.hidden=true;},cancelled:()=>{this.view.scroll.hidden=false;},save:(slot,image)=>this.upload(slot,image),error:message=>this.view.status(message,true)});
     this.file=root.querySelector('#profile-file');this.file.onchange=async()=>{const file=this.file.files[0];this.file.value='';try{await this.crop.open(file,this.slot);}catch(error){this.view.status(error.message,true);}};
     root.querySelector('#profile-retry').onclick=()=>this.load();root.querySelector('#profile-edit').onclick=()=>this.edit();root.querySelector('#profile-settings').onclick=()=>this.navigate(actions.settings);
@@ -10,7 +10,7 @@ class ProfileClient {
   }
   identity(){
     const uid=this.actions.user()?.id||null;if(uid===this.owner)return uid;
-    this.owner=uid;this.generation++;this.uid=null;this.data=null;this.draft=null;this.crop.clear();if(this.root.open)this.root.close();return uid;
+    this.owner=uid;this.generation++;this.uid=null;this.data=null;this.draft=null;this.historyRemoval=null;this.crop.clear();if(this.root.open)this.root.close();return uid;
   }
   async open(uid='me'){
     if(!this.identity())return this.actions.login(uid);
@@ -68,5 +68,23 @@ class ProfileClient {
     const generation=this.generation;
     try{await this.actions.api(`/expeditions/${encodeURIComponent(eid)}/pins/${encodeURIComponent(pid)}/vote`,'PUT',{value:0});if(generation!==this.generation)return;await this.load();this.actions.toast('已收回評價。');}
     catch(error){this.fail(error,generation);}
+  }
+  async removeHistory(id){
+    if(this.historyRemoval||this.uid!==this.owner||!this.data?.profile.own||this.tab!=='wall'||this.editing||!this.items.some(item=>item.id===id&&item.can_remove))return;
+    const operation={id,generation:this.generation,uid:this.uid};this.historyRemoval=operation;
+    const busy=value=>this.root.querySelectorAll('[data-profile-action=remove-history]').forEach(button=>{button.disabled=value;button.textContent=value&&button.dataset.id===id?'移除中…':'移除紀錄';});
+    busy(true);
+    try{
+      await this.actions.api('/profiles/me/wall/'+encodeURIComponent(id),'DELETE');
+      if(operation.generation!==this.generation||operation.uid!==this.uid)return;
+      if(this.tab==='wall'&&!this.editing){
+        this.generation++;this.recordRequest++;this.loadingRecords=false;
+        this.items=this.items.filter(item=>item.id!==id);this.next=null;
+        const total=Math.max(0,(this.data.wall.total||0)-1);this.data.wall={items:this.items,total,next_offset:null};
+        this.view.records(this.items,'wall',total,null);await this.load();
+      }
+      this.actions.toast('紀錄已從你的遠征隊牆移除。');
+    }catch(error){if(operation.generation===this.generation)this.fail(error);}
+    finally{if(this.historyRemoval===operation){this.historyRemoval=null;busy(false);}}
   }
 }
