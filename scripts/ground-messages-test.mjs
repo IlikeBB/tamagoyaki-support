@@ -15,7 +15,7 @@ try{
  for(const person of [b,c])await api(person,'/join','POST',{code:room.code});
  for(const person of users){await person.page.goto(origin);await expect.poll(()=>person.page.evaluate(()=>state.authenticated&&!state.demo&&!!map),{timeout:20000}).toBe(true);await person.page.evaluate(()=>clearInterval(pollTimer));}
  await b.page.locator('[data-action=pin-center]').click();await expect(b.page.locator('#map-actions')).toBeVisible();
- await b.page.locator('[data-map-create=message]').click();await expect(b.page.locator('#ground-message-position')).toContainText('25.03300');await expect(b.page.locator('#ground-message-hours')).toHaveValue('24');
+ await expect(b.page.locator('[data-map-create=message]')).toHaveCount(0);await b.page.evaluate(()=>{mapActions.close();groundMessages.open();});await expect(b.page.locator('#ground-message-position')).toContainText('25.03300');await expect(b.page.locator('#ground-message-hours')).toHaveValue('24');
  await b.page.screenshot({path:'artifacts/ground-message-form-mobile.png'});
  const text='前方有休息處\n<img src=x onerror="window.noteInjected=true"> 右側入口。';
  await b.page.locator('#ground-message-text').fill(text);await b.page.locator('#ground-message-form [type=submit]').click();await expect(b.page.locator('#dialog')).toBeHidden();
@@ -23,7 +23,7 @@ try{
  await expect(b.page.locator('.ground-message-marker')).toHaveCount(1);await expect(b.page.locator('.ground-message-copy')).toHaveText(text);await expect(b.page.locator('.ground-message-copy img,.ground-message-copy script')).toHaveCount(0);
  expect(await b.page.evaluate(()=>window.noteInjected)).toBeUndefined();expect(await b.page.evaluate(()=>state.watch)).toBeNull();expect(await b.page.evaluate(()=>state.scope)).toBe('off');
  expect((await api(b,path)).members.find(m=>m.user===b.user.id).lat).toBeNull();expect((await api(b,'/friends')).sharing).toBe(false);await expect(b.page.locator('#region-toggle')).toHaveAttribute('aria-pressed','false');
- checks.push('menu uses current Taiwan GPS rather than selected Japan map point; creates a fixed 24-hour note without live sharing; text remains safe plain text');
+ checks.push('creation menu entry removed; retained component uses current Taiwan GPS, creates a fixed note without live sharing, and keeps text safe');
  await b.context.setGeolocation({latitude:25.04,longitude:121.57,accuracy:10});expect((await api(b,path)).pins[0].lat).toBe(25.033);
  await c.page.evaluate(()=>refresh());await c.page.locator('.mobile-tabs [data-tab=pins]').click();await c.page.locator(`[data-action=pin-target][data-id="${pin.id}"]`).click();
  // A member can read the shared point after expanding the venue region.
@@ -33,15 +33,15 @@ try{
  await expect(c.page.locator(`[data-action=delete-pin][data-id="${pin.id}"]`)).toHaveCount(0);await expect(c.page.locator('#target-card [data-action=pin-vote][data-value="1"]')).toBeEnabled();
  await c.page.screenshot({path:'artifacts/ground-message-reading-mobile.png'});
  checks.push('moving the author does not move the message; another member can read the full message and vote without a deletion control');
- await b.page.locator('.mobile-tabs [data-tab=pins]').click();await expect(b.page.locator('#panel-content [data-action=ground-message]')).toBeVisible();
+ await b.page.locator('.mobile-tabs [data-tab=pins]').click();await expect(b.page.locator('#panel-content [data-action=ground-message]')).toHaveCount(0);
  await b.page.evaluate(()=>{window.realNoteGPS=navigator.geolocation.getCurrentPosition.bind(navigator.geolocation);navigator.geolocation.getCurrentPosition=(_success,error)=>error({code:1});});
- await b.page.locator('#panel-content [data-action=ground-message]').click();await expect(b.page.locator('#ground-message-position')).toContainText('請允許瀏覽器定位');
+ await b.page.evaluate(()=>groundMessages.open());await expect(b.page.locator('#ground-message-position')).toContainText('請允許瀏覽器定位');
  await b.page.locator('#ground-message-text').fill('沒有定位不能發布');await b.page.locator('#ground-message-form [type=submit]').click();await expect(b.page.locator('#ground-message-form .form-error')).toContainText('請允許瀏覽器定位');expect((await api(b,path)).pins).toHaveLength(1);
  await b.page.locator('#dialog [data-action=close]').click();
  await b.page.evaluate(()=>{navigator.geolocation.getCurrentPosition=success=>{window.releaseNoteGPS=()=>success({timestamp:Date.now(),coords:{latitude:25.04,longitude:121.57,accuracy:10}});};});
- await b.page.locator('#panel-content [data-action=ground-message]').click();await b.page.locator('#dialog [data-action=close]').click();await b.page.evaluate(()=>releaseNoteGPS());expect((await api(b,path)).pins).toHaveLength(1);await expect(b.page.locator('#dialog')).toBeHidden();
+ await b.page.evaluate(()=>groundMessages.open());await b.page.locator('#dialog [data-action=close]').click();await b.page.evaluate(()=>releaseNoteGPS());expect((await api(b,path)).pins).toHaveLength(1);await expect(b.page.locator('#dialog')).toBeHidden();
  await b.page.evaluate(()=>{navigator.geolocation.getCurrentPosition=window.realNoteGPS;});
- await b.page.locator('#panel-content [data-action=ground-message]').click();await expect(b.page.locator('#ground-message-position')).toContainText('25.04000');await b.page.locator('#ground-message-text').fill('切換遠征隊後不發布');
+ await b.page.evaluate(()=>groundMessages.open());await expect(b.page.locator('#ground-message-position')).toContainText('25.04000');await b.page.locator('#ground-message-text').fill('切換遠征隊後不發布');
  await b.page.evaluate(()=>{resetLobby();render();});await b.page.locator('#ground-message-form [type=submit]').click();await expect(b.page.locator('#ground-message-form .form-error')).toContainText('遠征隊已變更');expect((await api(b,path)).pins).toHaveLength(1);await b.page.locator('#dialog [data-action=close]').click();
  checks.push('GPS denial creates no note; a late GPS result cannot reopen a closed dialog; changing expedition prevents publication');
  await a.page.evaluate(()=>refresh());await a.page.locator('.mobile-tabs [data-tab=pins]').click();await a.page.locator(`[data-action=delete-pin][data-id="${pin.id}"]`).click();await expect.poll(async()=>(await api(a,path)).pins.length).toBe(0);

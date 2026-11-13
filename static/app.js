@@ -415,10 +415,10 @@ function render(){
   $('#member-count').textContent=state.members.length;$('#pin-count').textContent=state.pins.length;
   $('#friend-count').textContent=friends?.data.friends.length||0;
   $$('.section-nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===state.tab));
-  const names={tasks:['QUEST BOARD','現場的願望，現場實現。'],members:['PARTY MEMBERS','一起遠征，位置自己決定。'],friends:['FRIENDS',''],pins:['TEAM INTELLIGENCE','把現場情報，分享給隊友。']};
+  const names={tasks:['QUEST BOARD','現場的願望，現場實現。'],members:['PARTY MEMBERS','一起遠征，位置自己決定。'],friends:['FRIENDS',''],pins:['TEAM INTELLIGENCE','']};
   $('#panel-eyebrow').textContent=names[state.tab][0];$('#panel-title').textContent=names[state.tab][1];
   $('#panel-title').classList.toggle('hidden',!names[state.tab][1]);
-  $('.panel-heading').classList.toggle('hidden',state.tab==='members');
+  $('.panel-heading').classList.toggle('hidden',['members','pins'].includes(state.tab));
   $('#publish-small').setAttribute('aria-label',state.tab==='pins'?'發布地標':state.tab==='members'?'建立情報點':'發布任務');
   $('#publish-small').classList.toggle('hidden',state.tab==='friends');
   $('#search').placeholder=state.tab==='friends'?'搜尋好友暱稱或帳號…':state.tab==='tasks'?'找交換、配布物、或一點幫忙…':state.tab==='members'?'找你的遠征夥伴…':'找攤位、商店、或集合點…';
@@ -441,7 +441,7 @@ function renderPanel(){
   }else if(state.tab==='members'){
     root.innerHTML=`${!state.demo?SquadPanel.render(state):''}<div class="subheading">${state.members.length} 位遠征夥伴</div>`+state.members.filter(match).map((m,i)=>{const target=expeditionPeople().find(t=>t.owner===m.user)||finderTasks().find(t=>t.owner===m.user);return `<div class="member-row">${state.demo?avatar(m.nickname,i):profileAvatar(m.nickname,m.user,m.avatar_url,i)}<div class="member-info"><strong>${esc(m.nickname)}${m.user===state.user.id?'（你）':''}</strong><small>${m.online?'在線':'離線'} · ${memberSharesLocation(m)?'與遠征隊分享中':'未分享即時位置'}</small></div>${target?`<button data-action="task-target" data-id="${esc(target.id)}">尋找</button>`:''}</div>`;}).join('');
   }else{
-    root.innerHTML=(!state.demo?'<button class="button secondary full" data-action="ground-message">原地建立留言</button>':'')+`<p class="field-note">情報點分享給同一遠征隊的隊員。長按地圖可標記地標，選擇限時或永久保留；可由建立者或管理員（隊長）刪除；臨時地標的無效票多於有效票時自動移除，紀錄保留。</p>`+state.pins.filter(match).map(p=>`<article class="pin-row"><div class="pin-row-head"><span class="pin-row-icon">${icon(p.kind==='message'?'message':p.kind==='shop'?'shop':'pin')}</span><div class="pin-row-info"><h2>${esc(p.title)}</h2><p>${esc(pinTypes[p.kind])} · ${p.expires?'限時標記':'永久標記'} · ${esc(p.owner_name||state.user.nickname)}</p><p>${esc(p.description)}</p>${!state.demo?`<div class="pin-author">${profileAvatar(p.owner_name,p.owner,p.owner_avatar_url)}<span>查看發布者檔案</span></div>`:''}<button data-action="pin-target" data-id="${esc(p.id)}">在地圖上尋找 ↗</button>${p.can_delete?`<button class="delete-pin" data-action="delete-pin" data-id="${esc(p.id)}" ${pendingPinDeletes.has(p.id)?'disabled aria-busy="true"':''}>${pendingPinDeletes.has(p.id)?'刪除中…':'刪除'}</button>`:''}</div></div>${landmarkFeedback?.controls(p)||''}</article>`).join('');
+    root.innerHTML=`<p class="field-note">情報點分享給同一遠征隊的隊員。長按地圖可標記地標，選擇限時或永久保留；可由建立者或管理員（隊長）刪除；臨時地標的無效票多於有效票時自動移除，紀錄保留。</p>`+state.pins.filter(match).map(p=>`<article class="pin-row"><div class="pin-row-head"><span class="pin-row-icon">${icon(p.kind==='message'?'message':p.kind==='shop'?'shop':'pin')}</span><div class="pin-row-info"><h2>${esc(p.title)}</h2><p>${esc(pinTypes[p.kind])} · ${p.expires?'限時標記':'永久標記'} · ${esc(p.owner_name||state.user.nickname)}</p><p>${esc(p.description)}</p>${!state.demo?`<div class="pin-author">${profileAvatar(p.owner_name,p.owner,p.owner_avatar_url)}<span>查看發布者檔案</span></div>`:''}<button data-action="pin-target" data-id="${esc(p.id)}">在地圖上尋找 ↗</button>${p.can_delete?`<button class="delete-pin" data-action="delete-pin" data-id="${esc(p.id)}" ${pendingPinDeletes.has(p.id)?'disabled aria-busy="true"':''}>${pendingPinDeletes.has(p.id)?'刪除中…':'刪除'}</button>`:''}</div></div>${landmarkFeedback?.controls(p)||''}</article>`).join('');
   }
 }
 function renderLocation(){
