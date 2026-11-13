@@ -914,7 +914,7 @@ async function init(){
     enter:async(id,uid)=>{if(!state.authenticated||state.user.id!==uid)return;const room=state.rooms.find(room=>room.id===id);if(!room)throw new Error('隊伍已變更，請重新整理。');if(state.demo||state.room.id!==id)await enterRoom(room,state.user);if(state.authenticated&&state.user.id===uid){showMap();toast('已進入 '+room.name+'。');}},
     join:async(id,uid)=>{const room=await roomAdmission.join(id,uid);if(room&&state.authenticated&&state.user.id===uid)await finishRoomJoin(room,false);}
   });
-  pinFilters=new PinFilters($('#pin-filter'),$('#pin-filter-handle'),{stage:$('.map-stage'),user:()=>state.authenticated?state.user.id:null,target:()=>state.target,changed:()=>{if(config)render();}});
+  pinFilters=new PinFilters($('#pin-filter'),$('#pin-filter-handle'),{stage:$('.map-stage'),user:()=>state.authenticated?state.user.id:null,changed:()=>{if(config)render();}});
   landmarkReports=new LandmarkReportBoard({api,toast,user:()=>state.authenticated?state.user:null,refresh:()=>refresh({fresh:true}),context:()=>{const pin=targetPoint();return state.authenticated&&!state.demo&&state.target?.type==='pin'&&pin?.kind!=='message'&&pin?{user:state.user.id,eid:state.room.id,pid:pin.id}:null;}});
   groundMessages=new GroundMessages({
     context:()=>!state.demo&&state.authenticated?{room:state.room.id,user:state.user.id}:null,
