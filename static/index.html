@@ -12,18 +12,19 @@
   <style nonce="__CSP_NONCE__"></style>
   <link rel="stylesheet" href="/static/chat.css?v=20261113-chat2">
   <link rel="stylesheet" href="/static/profile.css?v=20261113-room-delete1">
+  <link rel="stylesheet" href="/static/news.css?v=20261113-news1"><script nonce="__CSP_NONCE__" src="/static/news.js?v=20261113-news1" defer></script>
   <script nonce="__CSP_NONCE__" src="/static/profile-view.js?v=20261113-optional-date1" defer></script><script nonce="__CSP_NONCE__" src="/static/profile-crop.js?v=20261113-room-delete1" defer></script><script nonce="__CSP_NONCE__" src="/static/profile.js?v=20261113-room-delete1" defer></script><script nonce="__CSP_NONCE__" src="/static/landmark-feedback.js?v=20261113-room-delete1" defer></script>
   <script nonce="__CSP_NONCE__" src="/static/chat-view.js?v=20261113-chat3" defer></script><script nonce="__CSP_NONCE__" src="/static/chat.js?v=20261113-chat2" defer></script>
   <script nonce="__CSP_NONCE__" src="/static/expedition-admin.js?v=20261113-optional-date1" defer></script>
   <script nonce="__CSP_NONCE__" src="/static/interface-gestures.js?v=20261113-map-zoom1" defer></script>
-  <script nonce="__CSP_NONCE__" src="/static/vendor/leaflet.js" defer></script><script nonce="__CSP_NONCE__" src="/static/google-map.js?v=20261113-place-search4" defer></script><script nonce="__CSP_NONCE__" src="/static/location-state.js?v=20261113-background2" defer></script><script nonce="__CSP_NONCE__" src="/static/finder.js?v=20261113-background2" defer></script><script nonce="__CSP_NONCE__" src="/static/friends.js?v=20261113-room-delete1" defer></script><script nonce="__CSP_NONCE__" src="/static/map-actions.js?v=20261113-place-search4" defer></script><script nonce="__CSP_NONCE__" src="/static/place-search.js?v=20261113-place-search4" defer></script><script nonce="__CSP_NONCE__" src="/static/assistance.js?v=20261113-background2" defer></script><script nonce="__CSP_NONCE__" src="/static/app-display.js?v=20261113-ios-viewport1" defer></script><script nonce="__CSP_NONCE__" src="/static/app.js?v=20261113-block-all1" defer></script>
+  <script nonce="__CSP_NONCE__" src="/static/vendor/leaflet.js" defer></script><script nonce="__CSP_NONCE__" src="/static/google-map.js?v=20261113-place-search4" defer></script><script nonce="__CSP_NONCE__" src="/static/location-state.js?v=20261113-background2" defer></script><script nonce="__CSP_NONCE__" src="/static/finder.js?v=20261113-background2" defer></script><script nonce="__CSP_NONCE__" src="/static/friends.js?v=20261113-room-delete1" defer></script><script nonce="__CSP_NONCE__" src="/static/map-actions.js?v=20261113-place-search4" defer></script><script nonce="__CSP_NONCE__" src="/static/place-search.js?v=20261113-place-search4" defer></script><script nonce="__CSP_NONCE__" src="/static/assistance.js?v=20261113-background2" defer></script><script nonce="__CSP_NONCE__" src="/static/app-display.js?v=20261113-ios-viewport1" defer></script><script nonce="__CSP_NONCE__" src="/static/app.js?v=20261113-news1" defer></script>
 </head>
 <body>
   <a href="#panel-content" class="skip-link">跳到遠征面板</a>
   <header class="app-header">
     <a class="brand" href="/" aria-label="玉子燒支援隊首頁"><img src="/static/icon.svg" alt="" width="42" height="42"><span><strong>玉子燒支援隊<span class="beta">BETA</span></strong><small>TAMAGOYAKI SUPPORT</small></span></a>
     <div class="header-note"><span class="tiny-spark">✦</span> 讓每一次遠征，都找得到彼此。</div>
-    <div class="header-actions"><button class="icon-button" id="chat-launcher" data-action="chat" aria-label="訊息" title="好友私訊／遠征隊群聊"><span data-icon="message"></span><span id="chat-unread" hidden></span></button><button class="icon-button" data-action="app-display" aria-label="全螢幕與加入主畫面" title="全螢幕／加入主畫面">⛶</button><button class="button outline account-button" id="account-button" data-action="account"><img id="account-avatar" alt="" hidden data-profile-image><span id="account-label">登入</span></button><button class="button primary" data-action="join"><span data-icon="users"></span><span id="join-label">開始組隊</span></button></div>
+    <div class="header-actions"><button class="icon-button" id="chat-launcher" data-action="chat" aria-label="訊息" title="好友私訊／遠征隊群聊"><span data-icon="message"></span><span id="chat-unread" hidden></span></button><button class="icon-button" data-action="app-display" aria-label="全螢幕與加入主畫面" title="全螢幕／加入主畫面">⛶</button><button class="button outline account-button" id="account-button" data-action="account"><img id="account-avatar" alt="" hidden data-profile-image><span id="account-label">登入</span></button><button class="button primary" data-action="join"><span data-icon="users"></span><span id="join-label">開始組隊</span></button><button type="button" id="news-launcher" class="news-launcher" aria-label="News 公告" aria-haspopup="dialog" aria-controls="news-dialog">News<span class="news-unread" aria-hidden="true" hidden></span></button></div>
   </header>
   <div class="workspace">
     <aside class="sidebar">
@@ -76,6 +77,13 @@
       </div>
     </div>
   </aside>
+  <dialog id="news-dialog" aria-labelledby="news-title" aria-describedby="news-intro">
+    <header class="news-toolbar"><div><div class="eyebrow">TAMAGOYAKI SUPPORT</div><h2 id="news-title">News 公告</h2></div><button type="button" id="news-close" aria-label="關閉公告" autofocus>×</button></header>
+    <p id="news-intro" class="news-intro">網站的新變化，還有下一場相聚。</p>
+    <nav class="news-filters" aria-label="公告分類"><button type="button" data-news-filter="all" aria-pressed="true">全部</button><button type="button" data-news-filter="update" aria-pressed="false">網站更新</button><button type="button" data-news-filter="event" aria-pressed="false">活動公告</button></nav>
+    <div class="news-status-row"><p id="news-status" role="status" aria-live="polite">正在載入公告…</p><button type="button" id="news-retry" hidden>重新載入</button></div>
+    <div class="news-scroll"><div id="news-list"></div></div>
+  </dialog>
   <dialog id="profile-dialog" aria-labelledby="profile-title">
     <header class="profile-toolbar"><h2 id="profile-title">個人檔案</h2><button type="button" id="profile-settings" hidden>帳號設定</button><button type="button" id="profile-edit" hidden>編輯檔案</button><button type="button" id="profile-close" aria-label="關閉個人檔案" autofocus>×</button></header>
     <div class="profile-status-row"><p id="profile-status" role="status" aria-live="polite"></p><button type="button" id="profile-retry" hidden>重試</button></div>

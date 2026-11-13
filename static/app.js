@@ -819,7 +819,7 @@ $('.map-stage').addEventListener('pointermove',e=>{
   if(e.pointerType==='touch'&&e.buttons&&e.clientX>=left&&e.clientX<=left+18&&!e.target.closest('#people-filter')){openPeopleFilter();e.stopPropagation();}
 },true);
 document.addEventListener('pointerdown',e=>{if(!$('#people-filter').hidden&&!e.target.closest('#people-filter,#people-filter-handle'))closePeopleFilter();});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#chat-dialog').open&&!$('#profile-dialog').open&&!$('#people-filter').hidden){closePeopleFilter(true);e.preventDefault();}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#chat-dialog').open&&!$('#profile-dialog').open&&!$('#news-dialog').open&&!$('#people-filter').hidden){closePeopleFilter(true);e.preventDefault();}});
 $('#dialog').addEventListener('click',e=>{if(e.target===$('#dialog')){const r=e.target.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)closeDialog();}});
 function resumeLocation(){
   if(document.hidden||!config)return;
