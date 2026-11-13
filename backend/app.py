@@ -43,13 +43,13 @@ LIVE_SECONDS = 120
 LOCATION_TTL_SECONDS = 15 * 60
 VENUES = [
     # Venue pin linked by https://www.m-messe.co.jp/access/?hl=ja
-    {"id": "makuhari", "name": "幕張メッセ", "short": "幕張", "lat": 35.6482, "lng": 140.0346703},
+    {"id": "makuhari", "name": "幕張展覽館", "short": "幕張展覽館", "lat": 35.6482, "lng": 140.0346703},
     # Centre from the map embedded by Yokohama's official visitors guide:
     # https://www.welcome.city.yokohama.jp/spot/details.php?bbid=885
-    {"id": "k-arena", "name": "Kアリーナ横浜", "short": "K 橫", "lat": 35.4645775, "lng": 139.6306334},
+    {"id": "k-arena", "name": "Kアリーナ横浜", "short": "Kアリーナ横浜", "lat": 35.4645775, "lng": 139.6306334},
     # MapFan venue point, checked against https://pia-arena-mm.jp/access/:
     # https://mapfan.com/spots/SC3AH%2CJ%2C1M0
-    {"id": "pia", "name": "ぴあアリーナMM", "short": "PIA", "lat": 35.4557702, "lng": 139.6284058},
+    {"id": "pia", "name": "ぴあアリーナMM(PIA)", "short": "ぴあアリーナMM(PIA)", "lat": 35.4557702, "lng": 139.6284058},
     # Venue pin linked by https://ariake-arena.tokyo/english/ (Google Map).
     {"id": "ariake", "name": "有明アリーナ", "short": "有明", "lat": 35.6433718, "lng": 139.7941814},
     # Kanadevia Hall inside Tokyo Dome City's MEETS PORT (not Tokyo Dome stadium):

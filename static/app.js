@@ -90,7 +90,7 @@ async function initFacilityOverlay(){
     if(!response.ok)throw new Error('facility map unavailable');
     const data=await response.json();
     if(ownerMap!==map)return;
-    const options={pane:'facility',opacity:0.85,interactive:false,alt:'幕張メッセ場館示意圖，官方設施圖標已移除',className:'facility-overlay',attribution:'場館圖：<a href="https://www.m-messe.co.jp/facility/" target="_blank" rel="noopener">幕張メッセ</a>（移除圖標、約略對齊）'};
+    const options={pane:'facility',opacity:0.85,interactive:false,alt:'幕張展覽館場館示意圖，官方設施圖標已移除',className:'facility-overlay',attribution:'場館圖：<a href="https://www.m-messe.co.jp/facility/" target="_blank" rel="noopener">幕張展覽館</a>（移除圖標、約略對齊）'};
     if(map.isGoogle)facilityLayer=map.addFacility(data,options);
     else{
       map.createPane('facility');map.getPane('facility').style.zIndex='300';map.getPane('facility').style.pointerEvents='none';
