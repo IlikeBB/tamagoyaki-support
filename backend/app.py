@@ -20,7 +20,6 @@ from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import Literal
 from .accounts import Accounts, client_address
 from .friends import Friends
-from .places import Places
 from .assistance import Assistance
 from .chat import Chat
 from .reputation import Reputation
@@ -90,7 +89,6 @@ def connect():
 accounts = Accounts(connect, PUBLIC_ORIGIN, SESSION_DAYS)
 assistance = Assistance(connect, accounts, LOCATION_TTL_SECONDS)
 friends = Friends(connect, accounts, LOCATION_TTL_SECONDS, help_required=assistance.required, fresh_seconds=LIVE_SECONDS)
-places = Places(VENUES, PUBLIC_ORIGIN)
 chat = Chat(connect, accounts)
 reputation = Reputation(connect, accounts)
 task_feedback = TaskFeedback(connect, accounts)
@@ -346,8 +344,8 @@ def config():
 
 
 @app.get('/api/places/search')
-def search_places(q: str = Query(min_length=2,max_length=120)):
-    return {'results':places.search(q)}
+def search_places():
+    raise HTTPException(410,'地點搜尋已改用 Google Maps，請重新整理網頁後再搜尋。')
 
 
 @app.get("/api/me")

@@ -33,12 +33,21 @@ class PlaceSearch {
       for(const point of results){
         const button=document.createElement('button');button.type='button';button.className='place-search-result';
         const name=document.createElement('strong'),address=document.createElement('small');name.textContent=point.name;address.textContent=point.address||'查看地圖位置';
-        button.append(name,address);button.addEventListener('click',()=>this.choose(point));this.content.append(button);
+        button.append(name,address);button.addEventListener('click',()=>this.choose(point));this.content.append(button);this.attribution(point);
       }
     }catch(error){if(generation===this.generation){this.content.replaceChildren();this.status.textContent=error.message;}}
     finally{this.busy=false;this.button.disabled=false;this.root.removeAttribute('aria-busy');}
   }
   choose(point){this.selected={...point};this.options.select(point);this.showSelected();}
+  attribution(point){
+    for(const item of point.attributions||[]){
+      if(!item.provider)continue;
+      const text=document.createElement('p');text.className='place-provider';
+      let uri;try{const url=new URL(item.uri);if(['https:','http:'].includes(url.protocol))uri=url.href;}catch{}
+      if(uri){const link=document.createElement('a');link.href=uri;link.textContent=item.provider;link.target='_blank';link.rel='noopener noreferrer';text.append(link);}else text.textContent=item.provider;
+      this.content.append(text);
+    }
+  }
   showSelected(){
     if(!this.selected)return;
     this.open();this.content.replaceChildren();this.status.textContent='已移到地圖上的選定地點。';
@@ -49,6 +58,6 @@ class PlaceSearch {
       const button=document.createElement('button');button.type='button';button.textContent=label;button.dataset.placeCreate=type;
       button.addEventListener('click',()=>{const point={...this.selected};this.close();this.options.create(type,point);});actions.append(button);
     }
-    this.content.append(title,address,actions);
+    this.content.append(title,address,actions);this.attribution(this.selected);
   }
 }

@@ -904,6 +904,7 @@ window.addEventListener('online',()=>{refresh();friends?.sync();});
 window.addEventListener('offline',()=>{state.online=false;state.members=state.members.map(m=>({...m,lat:null,lng:null}));render();});
 window.addEventListener('tamago-google-auth-failure',async()=>{
   if(!map?.isGoogle)return;
+  placeSearch?.clear();
   facilityLayer?.remove();facilityLayer=null;layers.clearLayers();map.destroy();map=null;
   await initMap(true);renderMap();
 });
@@ -948,7 +949,7 @@ async function init(){
     create:(type,point)=>type==='message'?groundMessages.open():showPublish(type,point)
   });
   placeSearch=new PlaceSearch($('#place-search'),{
-    search:query=>api('/places/search?q='+encodeURIComponent(query)),
+    search:query=>TamagoGooglePlaces.search(query,config?.maps,map),
     open:()=>mapActions?.dismiss(),
     select:point=>{const expanded=showPositionOnMap(point);renderMap();if(expanded)toast('已關閉一公里限制，顯示搜尋到的地點。');},
     changed:()=>{if(config)renderMap();},

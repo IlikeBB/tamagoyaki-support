@@ -1,6 +1,16 @@
 {
   "announcements": [
     {
+      "id": "google-place-search-20261113",
+      "type": "update",
+      "published_at": "2026-11-13",
+      "title": "用 Google 地圖尋找集合地點",
+      "body": [
+        "左上角地點搜尋改用 Google Maps 的地點資料，輸入名稱或地址後按搜尋即可查看結果，支援台灣與日本。",
+        "選取後可照常標記限時／永久地標或插旗發布任務，範圍外的結果會自動解除一公里限制。搜尋不會開啟 GPS 或改變定位分享設定。"
+      ]
+    },
+    {
       "id": "profile-rpg-20261113",
       "type": "update",
       "published_at": "2026-11-13",
