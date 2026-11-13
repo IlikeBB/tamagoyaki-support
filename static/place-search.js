@@ -45,7 +45,7 @@ class PlaceSearch {
     const title=document.createElement('strong'),address=document.createElement('p'),actions=document.createElement('div');
     title.className='place-selected-name';title.textContent=this.selected.name;address.className='place-selected-address';address.textContent=this.selected.address;
     actions.className='place-selected-actions';
-    for(const [type,label] of [['pin','標記臨時地標'],['task','插旗任務']]){
+    for(const [type,label] of [['pin','標記地標'],['task','插旗任務']]){
       const button=document.createElement('button');button.type='button';button.textContent=label;button.dataset.placeCreate=type;
       button.addEventListener('click',()=>{const point={...this.selected};this.close();this.options.create(type,point);});actions.append(button);
     }

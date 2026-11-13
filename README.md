@@ -139,9 +139,9 @@ iPhone／iPad 主畫面模式（`navigator.standalone`）使用 `100vh` 作為�
 
 帳號選單提供「全螢幕／加入主畫面」。支援 Fullscreen API 的瀏覽器可在點擊後進入全螢幕；iPhone／iPad 顯示 Safari 加入主畫面步驟，Android／電腦提供安裝引導與可用時的原生安裝提示。安裝後從主畫面啟動使用 `fullscreen`，不支援時回退至 `standalone`；已加入 iOS 網頁 App 設定與安全區留白。普通分頁不會自動強制全螢幕。服務工作者仍不快取私密 API 或地圖。參考 [MDN 安裝提示](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/How_to/Trigger_install_prompt)、[顯示模式](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Manifest/Reference/display)、[Fullscreen API](https://developer.mozilla.org/en-US/docs/Web/API/Element/requestFullscreen) 與 [Chrome 安裝網頁應用程式](https://support.google.com/chrome/answer/9658361?co=GENIE.Platform%3DAndroid&hl=zh-Hant)。
 
-地圖左上角可輸入地點名稱或地址，按「搜尋」後選取結果，再建立臨時地標或固定任務旗標。搜尋範圍包含台灣；範圍外的結果會自動關閉一公里限制。地點資料來自 OpenStreetMap／Photon，底圖仍使用原本的 Google Maps。搜尋只在使用者送出時執行，伺服器快取 24 小時、同時最多一個請求，且請求間隔至少 1.1 秒；不會將使用者 GPS 傳給搜尋服務。可用 `TAMAGO_PLACE_SEARCH_URL` 切換自架 Photon 的 `/api/` 位址。公開服務可能限流或暫時無法使用，錯誤時仍可長按地圖標記。參考 [Photon API](https://github.com/komoot/photon/blob/master/docs/api-v1.md) 與 [服務使用說明](https://github.com/komoot/photon#demo-server)。
+地圖左上角可輸入地點名稱或地址，按「搜尋」後選取結果，再標記限時／永久地標或固定任務旗標。搜尋範圍包含台灣；範圍外的結果會自動關閉一公里限制。地點資料來自 OpenStreetMap／Photon，底圖仍使用原本的 Google Maps。搜尋只在使用者送出時執行，伺服器快取 24 小時、同時最多一個請求，且請求間隔至少 1.1 秒；不會將使用者 GPS 傳給搜尋服務。可用 `TAMAGO_PLACE_SEARCH_URL` 切換自架 Photon 的 `/api/` 位址。公開服務可能限流或暫時無法使用，錯誤時仍可長按地圖標記。參考 [Photon API](https://github.com/komoot/photon/blob/master/docs/api-v1.md) 與 [服務使用說明](https://github.com/komoot/photon#demo-server)。
 
-長按地圖約 0.6 秒（電腦也可按右鍵），可在選定位置插旗或建立臨時地標。旗標不隨發布者的 GPS 移動，座標仍只有接取者可見；臨時地標可選 2、6 或 24 小時。建立者與目前遠征隊的建立者（管理員／隊長）可刪除地標，伺服器會檢查權限。方向卡顯示在地圖左下側，位於定位設定卡下方。
+長按地圖約 0.6 秒（電腦也可按右鍵），可在選定位置插旗或選擇「標記地標」。旗標不隨發布者的 GPS 移動，座標仍只有接取者可見；地標可選 2、6、24 小時，或「永久標記」。永久標記以 `hours: 0` 發布，`expires` 為 `null`，不會自動到期，且不參與臨時地標的評價與自動移除。建立者與目前遠征隊的建立者（管理員／隊長）可刪除地標，伺服器會檢查權限。方向卡顯示在地圖左下側，位於定位設定卡下方。
 
 ```powershell
 conda run -n agent python -m unittest discover -s tests -t . -v

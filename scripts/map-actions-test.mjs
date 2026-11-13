@@ -46,7 +46,8 @@ try{
   pointOffset=1;
   await page.locator('[data-mobile=map]').click();
   const pinPoint=await hold();await page.locator('[data-map-create=pin]').click();
-  await expect(page.locator('#hours')).toHaveValue('2');await expect(page.locator('#hours option[value="0"]')).toHaveCount(0);
+  await expect(page.locator('#dialog-body h2')).toHaveText('標記地標。');
+  await expect(page.locator('#hours')).toHaveValue('2');await expect(page.locator('#hours option[value="0"]')).toHaveText('永久標記');
   await page.locator('#title').fill('臨時地標 '+suffix);await page.locator('#publish-form [type=submit]').click();await expect(page.locator('#dialog')).not.toBeVisible();
   data=await (await b.context.request.get(origin+path)).json();const pin=data.pins.find(p=>p.title==='臨時地標 '+suffix);expect(pin.lat).toBeCloseTo(pinPoint.lat,6);expect(pin.expires-pin.created).toBe(7200);
   await expect(page.locator(`[data-action=delete-pin][data-id="${pin.id}"]`)).toBeVisible();

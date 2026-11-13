@@ -414,7 +414,7 @@ function renderPanel(){
   }else if(state.tab==='members'){
     root.innerHTML=`<div class="squad-card"><h2>${icon('users')} 遠征隊夥伴</h2>${!state.demo?`<button class="button secondary full" data-action="chat-room">${icon('message')} 遠征隊群聊</button>`:''}<p>每個人可自行選擇分享對象。只有開啟「目前遠征隊」分享的成員，才會在隊伍地圖上顯示即時位置。</p><button class="text-button" data-action="location">${icon('location')} 設定我的分享對象</button><button class="text-button" data-action="publish-intel">${icon('pin')} 為隊友建立情報點</button></div><div class="subheading">${state.members.length} 位遠征夥伴</div>`+state.members.filter(match).map((m,i)=>{const target=expeditionPeople().find(t=>t.owner===m.user)||finderTasks().find(t=>t.owner===m.user);return `<div class="member-row">${state.demo?avatar(m.nickname,i):profileAvatar(m.nickname,m.user,m.avatar_url,i)}<div class="member-info"><strong>${esc(m.nickname)}${m.user===state.user.id?'（你）':''}</strong><small>${m.online?'在線':'離線'} · ${memberSharesLocation(m)?'與遠征隊分享中':'未分享即時位置'}</small></div>${target?`<button data-action="task-target" data-id="${esc(target.id)}">尋找</button>`:''}</div>`;}).join('');
   }else{
-    root.innerHTML=(!state.demo?'<button class="button secondary full" data-action="ground-message">原地建立留言</button>':'')+`<p class="field-note">情報點分享給同一遠征隊的隊員。長按地圖可建立臨時地標；可由建立者或管理員（隊長）刪除；臨時地標的無效票多於有效票時自動移除，紀錄保留。</p>`+state.pins.filter(match).map(p=>`<article class="pin-row"><div class="pin-row-head"><span class="pin-row-icon">${icon(p.kind==='message'?'message':p.kind==='shop'?'shop':'pin')}</span><div class="pin-row-info"><h2>${esc(p.title)}</h2><p>${esc(pinTypes[p.kind])} · ${p.expires?'限時情報':'永久情報'} · ${esc(p.owner_name||state.user.nickname)}</p><p>${esc(p.description)}</p>${!state.demo?`<div class="pin-author">${profileAvatar(p.owner_name,p.owner,p.owner_avatar_url)}<span>查看發布者檔案</span></div>`:''}<button data-action="pin-target" data-id="${esc(p.id)}">在地圖上尋找 ↗</button>${p.can_delete?`<button class="delete-pin" data-action="delete-pin" data-id="${esc(p.id)}">刪除</button>`:''}</div></div>${landmarkFeedback?.controls(p)||''}</article>`).join('');
+    root.innerHTML=(!state.demo?'<button class="button secondary full" data-action="ground-message">原地建立留言</button>':'')+`<p class="field-note">情報點分享給同一遠征隊的隊員。長按地圖可標記地標，選擇限時或永久保留；可由建立者或管理員（隊長）刪除；臨時地標的無效票多於有效票時自動移除，紀錄保留。</p>`+state.pins.filter(match).map(p=>`<article class="pin-row"><div class="pin-row-head"><span class="pin-row-icon">${icon(p.kind==='message'?'message':p.kind==='shop'?'shop':'pin')}</span><div class="pin-row-info"><h2>${esc(p.title)}</h2><p>${esc(pinTypes[p.kind])} · ${p.expires?'限時標記':'永久標記'} · ${esc(p.owner_name||state.user.nickname)}</p><p>${esc(p.description)}</p>${!state.demo?`<div class="pin-author">${profileAvatar(p.owner_name,p.owner,p.owner_avatar_url)}<span>查看發布者檔案</span></div>`:''}<button data-action="pin-target" data-id="${esc(p.id)}">在地圖上尋找 ↗</button>${p.can_delete?`<button class="delete-pin" data-action="delete-pin" data-id="${esc(p.id)}">刪除</button>`:''}</div></div>${landmarkFeedback?.controls(p)||''}</article>`).join('');
   }
 }
 function renderLocation(){
@@ -575,16 +575,21 @@ function showSquad(mode){
   dialog(`<h2>${create?'小隊集合！':'加入同行小隊。'}</h2><p>同一個遠征隊裡，和最熟的夥伴保持聯繫。切換小隊不影響已開啟的好友分享。</p><form id="squad-form"><label for="squad-value">${create?'小隊名稱':'小隊邀請碼'}</label><input id="squad-value" name="value" required maxlength="${create?30:8}" ${create?'':'minlength="8" pattern="[A-Za-z0-9]{8}"'} placeholder="${create?'例如：玉子燒小隊':'8 位小隊邀請碼'}"><div class="form-error" role="alert"></div><button class="button primary full" type="submit">${create?'建立小隊':'加入小隊'}</button></form>`);
   $('#squad-form').onsubmit=async e=>{e.preventDefault();await submit(e.target,async()=>{const value=new FormData(e.target).get('value');await stopTeamLocation();await api(`/expeditions/${state.room.id}/squads${create?'':'/join'}`,'POST',create?{name:value}:{code:value.toUpperCase()});await refresh();closeDialog();toast('小隊已就位，可用左側篩選顯示同小隊隊友。');});};
 }
-function showPublish(type='task',point,{temporary=false}={}){
+function showPublish(type='task',point){
   if(state.demo)return showJoin();
   const task=type==='task',fixed=task&&!!point,center=point||map?.getCenter()||venue(),roomId=state.room.id;
   const pos=task&&!fixed?(state.position?{...state.position}:null):{lat:center.lat,lng:center.lng};
   let chosen=pos;
   const description=fixed?'任務旗標固定在你選的地點，不會隨你的定位移動。只有接取任務的人能查看座標。':task?'發布前記錄你目前的位置。任務尚未被接取時，其他隊員看不到座標。':'地標會分享給這支遠征隊的隊員；可由建立者或管理員（隊長）刪除；臨時地標的無效票多於有效票時自動移除，紀錄保留。';
-  const hours=temporary?'<option value="2" selected>2 小時</option><option value="6">6 小時</option><option value="24">24 小時</option>':`${task?'':'<option value="2">2 小時</option>'}<option value="6" selected>6 小時</option><option value="24">24 小時</option>${task?'':'<option value="0">永久情報點</option>'}`;
-  dialog(`<h2>${fixed?'在這裡插旗。':task?'發布一個小小願望。':temporary?'標記臨時地標。':'為遠征隊建立情報點。'}</h2><p>${description}</p><form id="publish-form"><label for="kind">${task?'任務':'情報'}類型</label><select id="kind" name="kind">${Object.entries(task?types:pinTypes).filter(([key])=>key!=="message").map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select><label for="title">標題</label><input id="title" name="title" required maxlength="80" placeholder="${task?'例如：35 換狐，現場交換':'例如：holodori 特典領取處'}"><label for="description">補充說明</label><textarea id="description" name="description" maxlength="600" placeholder="辨識方式、數量或現場資訊…"></textarea><label for="hours">有效時間</label><select id="hours" name="hours">${hours}</select><div class="coordinate-note">${icon('pin')} <strong id="coord-label">${fixed?'任務旗標位置':task?'你的任務發布位置':point?'情報點：選定地點':'情報點：地圖中心'}</strong><br><span id="coord-value">${chosen?`${chosen.lat.toFixed(5)}, ${chosen.lng.toFixed(5)}`:'請先取得目前位置'}</span>${fixed?'':`<br><button type="button" id="use-position">${task?'取得／更新我的位置':'改用我的目前位置'}</button>`}<p class="field-note">${fixed?'旗標保留在這裡；完成、撤回或到期後停止提供任務位置。':task?'只有接取者能取得此座標。開啟定位可繼續更新；停止即時定位後仍保留任務發布點，撤回任務可停止提供座標。':temporary?'到期後自動隱藏；建立者或管理員（隊長）也可提前刪除。':'可關閉視窗後，長按地圖選擇其他地點。'}</p></div><div class="form-error" role="alert"></div><button class="button primary full" type="submit">${task?'發布任務':temporary?'建立臨時地標':'建立情報點'} ${icon('plus')}</button></form>`);
+  const hours=(task?[6,24]:[2,6,24,0]).map(hours=>`<option value="${hours}" ${hours===(!task&&point?2:6)?'selected':''}>${hours?hours+' 小時':'永久標記'}</option>`).join('');
+  dialog(`<h2>${fixed?'在這裡插旗。':task?'發布一個小小願望。':'標記地標。'}</h2><p>${description}</p><form id="publish-form"><label for="kind">${task?'任務':'情報'}類型</label><select id="kind" name="kind">${Object.entries(task?types:pinTypes).filter(([key])=>key!=="message").map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select><label for="title">標題</label><input id="title" name="title" required maxlength="80" placeholder="${task?'例如：35 換狐，現場交換':'例如：holodori 特典領取處'}"><label for="description">補充說明</label><textarea id="description" name="description" maxlength="600" placeholder="辨識方式、數量或現場資訊…"></textarea><label for="hours">有效時間</label><select id="hours" name="hours">${hours}</select><div class="coordinate-note">${icon('pin')} <strong id="coord-label">${fixed?'任務旗標位置':task?'你的任務發布位置':point?'情報點：選定地點':'情報點：地圖中心'}</strong><br><span id="coord-value">${chosen?`${chosen.lat.toFixed(5)}, ${chosen.lng.toFixed(5)}`:'請先取得目前位置'}</span>${fixed?'':`<br><button type="button" id="use-position">${task?'取得／更新我的位置':'改用我的目前位置'}</button>`}<p class="field-note">${fixed?'旗標保留在這裡；完成、撤回或到期後停止提供任務位置。':task?'只有接取者能取得此座標。開啟定位可繼續更新；停止即時定位後仍保留任務發布點，撤回任務可停止提供座標。':'可選擇限時或永久保留；建立者或管理員（隊長）可以刪除。'}</p></div><div class="form-error" role="alert"></div><button class="button primary full" type="submit">${task?'發布任務':'建立地標'} ${icon('plus')}</button></form>`);
   if(point?.name)$('#title').value=point.name.slice(0,80);
   const form=$('#publish-form');let helpPoint=null,helpRequest=0;
+  if(!task){
+    const duration=$('#hours'),note=form.querySelector('.coordinate-note .field-note');
+    const describe=()=>{note.textContent=duration.value==='0'?'永久標記不會自動到期，可由建立者或管理員（隊長）刪除。':'限時標記到期後自動隱藏；無效票多於有效票時會自動移除，評價紀錄保留。建立者或隊長也可提前刪除。';};
+    duration.addEventListener('change',describe);describe();
+  }
   if(task){
     const setup=document.createElement('div');setup.id='help-setup';setup.className='help-setup';setup.hidden=true;
     setup.innerHTML='<strong>! 求助會開啟持續定位</strong><p>這支遠征隊的所有成員都能看到你的即時位置，不需要接取任務。使用自己的 GPS 位置，並持續分享至刪除求助任務。</p><span id="help-coord" role="status">正在取得定位…</span><button type="button" id="help-gps">取得／更新定位</button>';
@@ -636,7 +641,7 @@ function showPublish(type='task',point,{temporary=false}={}){
       if(task)body.location_mode=!isHelp&&fixed?'fixed':'publisher';
       if(isHelp){body.help_broadcast=true;body.accuracy=helpPoint.accuracy;state.position={lat:helpPoint.lat,lng:helpPoint.lng,accuracy:helpPoint.accuracy};lastPositionAt=helpPoint.timestamp;}
       await api(`/expeditions/${roomId}/${task?'tasks':'pins'}`,'POST',body);await refresh();
-      closeDialog();setTab(task?'tasks':'pins');toast(isHelp?'求助已發布，全遠征隊可查看即時位置；刪除求助後才停止分享。':fixed?'任務旗標已插在選定地點；接取者可查看。':task?'任務已發布；只有接取者能取得你的座標。':temporary?'臨時地標已分享，到期後會自動隱藏。':'情報點已分享給遠征隊。');
+      closeDialog();setTab(task?'tasks':'pins');toast(isHelp?'求助已發布，全遠征隊可查看即時位置；刪除求助後才停止分享。':fixed?'任務旗標已插在選定地點；接取者可查看。':task?'任務已發布；只有接取者能取得你的座標。':body.hours?'限時地標已分享，到期後會自動隱藏。':'永久地標已分享給遠征隊。');
     });
   };
 }
@@ -744,7 +749,7 @@ async function taskAction(id,action){
   }catch(e){toast(e.message);}finally{state.pending=false;}
 }
 function help(){
-  dialog(`<h2>和熟悉的人，一起會合。</h2><ol class="help-list"><li><strong>定位分享：</strong>在「定位設定」選擇僅供本機、只給好友、只給目前遠征隊或只給任務接取者；一次只分享給一種對象。</li><li><strong>加入好友：</strong>到「好友」輸入對方帳號，雙方接受後即可選擇與好友分享，不必加入隊伍。</li><li><strong>選擇遠征隊：</strong>登入後，在場館列表加入隊伍。只有主動開啟隊伍分享的人，才會在隊伍地圖顯示位置。</li><li><strong>一般任務：</strong>記錄目前位置，任務發布點只有接取者能取得。停止即時定位不會移除發布點，撤回任務可停止提供。</li><li><strong>發布求助：</strong>須允許 GPS，位置會分享給求助所在遠征隊的所有成員，地圖顯示紅色驚嘆號；刪除最後一個求助後才停止持續分享。</li><li><strong>前往會合：</strong>好友、已分享位置的遠征隊成員及已接任務，都可在尋人視窗查看方向與直線距離。</li><li><strong>左側篩選：</strong>碰觸地圖左邊緣，選擇所有人、好友、遠征隊成員或同小隊隊友。</li><li><strong>長按地圖：</strong>在選定位置插旗發布任務，或建立有到期時間的臨時地標。也可按地圖右側地標按鈕選擇地圖中心。</li><li><strong>管理情報點：</strong>為同隊夥伴標記攤位、配布、洗手間或集合點；只有建立者或管理員（遠征隊隊長）能刪除。</li></ol><p class="field-note">切換分享對象會先撤回原本的即時位置。停止定位或登出會立即撤回即時座標。超過 2 分鐘未更新會標示「最後位置」，滿 15 分鐘未更新後隱藏。情報點與任務發布點依原本權限保留。</p><p class="field-note">網頁不能跨其他 App 懸浮；切到背景會保留最後位置 15 分鐘，手機系統可能暫停 GPS 更新；回到網頁會重新定位。距離是直線距離，室內 GPS 可能不準確。可用「1 km 範圍」開關切換場館周邊與不限範圍。</p><button class="button primary full" data-action="close">知道了 ${icon('arrow')}</button>`);
+  dialog(`<h2>和熟悉的人，一起會合。</h2><ol class="help-list"><li><strong>定位分享：</strong>在「定位設定」選擇僅供本機、只給好友、只給目前遠征隊或只給任務接取者；一次只分享給一種對象。</li><li><strong>加入好友：</strong>到「好友」輸入對方帳號，雙方接受後即可選擇與好友分享，不必加入隊伍。</li><li><strong>選擇遠征隊：</strong>登入後，在場館列表加入隊伍。只有主動開啟隊伍分享的人，才會在隊伍地圖顯示位置。</li><li><strong>一般任務：</strong>記錄目前位置，任務發布點只有接取者能取得。停止即時定位不會移除發布點，撤回任務可停止提供。</li><li><strong>發布求助：</strong>須允許 GPS，位置會分享給求助所在遠征隊的所有成員，地圖顯示紅色驚嘆號；刪除最後一個求助後才停止持續分享。</li><li><strong>前往會合：</strong>好友、已分享位置的遠征隊成員及已接任務，都可在尋人視窗查看方向與直線距離。</li><li><strong>左側篩選：</strong>碰觸地圖左邊緣，選擇所有人、好友、遠征隊成員或同小隊隊友。</li><li><strong>長按地圖：</strong>在選定位置插旗發布任務，或建立限時／永久地標。也可按地圖右側地標按鈕選擇地圖中心。</li><li><strong>管理情報點：</strong>為同隊夥伴標記攤位、配布、洗手間或集合點；只有建立者或管理員（遠征隊隊長）能刪除。</li></ol><p class="field-note">切換分享對象會先撤回原本的即時位置。停止定位或登出會立即撤回即時座標。超過 2 分鐘未更新會標示「最後位置」，滿 15 分鐘未更新後隱藏。情報點與任務發布點依原本權限保留。</p><p class="field-note">網頁不能跨其他 App 懸浮；切到背景會保留最後位置 15 分鐘，手機系統可能暫停 GPS 更新；回到網頁會重新定位。距離是直線距離，室內 GPS 可能不準確。可用「1 km 範圍」開關切換場館周邊與不限範圍。</p><button class="button primary full" data-action="close">知道了 ${icon('arrow')}</button>`);
 }
 document.addEventListener('click',async e=>{
   const b=e.target.closest('button');if(!b)return;
@@ -880,14 +885,14 @@ async function init(){
       return map.containerPointToLatLng([x-rect.left,y-rect.top]);
     },
     allowed:point=>{if(!inRegion(point)){toast('這裡超出一公里範圍，可先關閉範圍限制。');return false;}return true;},
-    create:(type,point)=>type==='message'?groundMessages.open():showPublish(type,point,{temporary:type==='pin'})
+    create:(type,point)=>type==='message'?groundMessages.open():showPublish(type,point)
   });
   placeSearch=new PlaceSearch($('#place-search'),{
     search:query=>api('/places/search?q='+encodeURIComponent(query)),
     open:()=>mapActions?.dismiss(),
     select:point=>{const expanded=showPositionOnMap(point);renderMap();if(expanded)toast('已關閉一公里限制，顯示搜尋到的地點。');},
     changed:()=>{if(config)renderMap();},
-    create:(type,point)=>showPublish(type,point,{temporary:type==='pin'})
+    create:(type,point)=>showPublish(type,point)
   });
   assistance=new AssistanceClient({
     user:()=>state.authenticated?state.user:null,api,toast,refresh,
