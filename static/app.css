@@ -29,7 +29,9 @@
 .location-card.location-active .location-symbol{display:none}
 .location-card .location-dismiss{display:grid;place-items:center;flex-shrink:0;width:32px;min-height:36px;padding:0;border-radius:6px;color:var(--muted);font-size:22px}
 .location-dismiss:hover{background:var(--green-soft)}
-.location-reopen{display:inline-flex;align-items:center;gap:7px;align-self:flex-end;pointer-events:auto;min-height:36px;padding:7px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);box-shadow:var(--shadow);font-size:11px;font-weight:650}
+.location-reopen{display:inline-flex;align-items:center;gap:7px;align-self:flex-end;pointer-events:auto;min-height:44px;padding:7px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);box-shadow:var(--shadow);font-size:11px;font-weight:650}
+/* Keep the collapsed settings below the direction card and clear of map attribution. */
+.map-bottom:has(>#location-reopen:not(.hidden)){bottom:24px}
 .map-control-actions{display:flex;align-items:center;gap:7px}
 @media(max-width:700px){.map-control-actions{gap:5px}.map-control-actions .map-button{padding:8px;font-size:9px;gap:5px}}
 .direction-needle{display:block;width:100%;height:100%;overflow:visible}
