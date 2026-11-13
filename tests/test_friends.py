@@ -14,7 +14,7 @@ class FriendsTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.temp = tempfile.TemporaryDirectory()
-        cls.module = importlib.import_module('app')
+        cls.module = importlib.import_module('backend.app')
         cls.original_db = cls.module.DB
         cls.module.DB = Path(cls.temp.name) / 'friends.sqlite3'
         cls.ctx = TestClient(cls.module.app)

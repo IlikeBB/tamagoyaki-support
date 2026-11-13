@@ -2,7 +2,7 @@ import concurrent.futures
 import secrets
 
 from fastapi.testclient import TestClient
-import test_app
+from tests import test_app
 
 
 class ExpeditionAdminTest(test_app.RendezvousTest):

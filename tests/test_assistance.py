@@ -1,4 +1,4 @@
-import test_app
+from tests import test_app
 
 
 class AssistanceTest(test_app.RendezvousTest):

@@ -6,7 +6,8 @@ if ($Settings.tunnelId -notmatch '^[0-9a-f-]{36}$' -or $Settings.hostname -notma
 $LocalOrigin = "http://127.0.0.1:$($Settings.port)"
 $PublicOrigin = "https://$($Settings.hostname)"
 $Logs = Join-Path $Root '.run-logs'
-$Entry = Join-Path $Root 'server.py'
+$Entry = Join-Path $Root 'backend\server.py'
+$LegacyEntry = Join-Path $Root 'server.py'
 $RuntimePath = Join-Path $Logs 'public-runtime.json'
 $TunnelConfig = Join-Path $Logs 'tamagoyaki-tunnel.yml'
 $CredentialFile = Join-Path $env:USERPROFILE ".cloudflared\$($Settings.tunnelId).json"
@@ -31,7 +32,7 @@ try {
   if ($listeners.Count) {
     if (!$runtime -or $runtime.root -ne $Root -or $listeners.OwningProcess -notcontains $runtime.appPid) { throw 'Port is occupied by an unmanaged process.' }
     $process = Get-CimInstance Win32_Process -Filter "ProcessId=$($runtime.appPid)"
-    if (!$process.CommandLine.Contains($Entry) -or !(Test-Health $LocalOrigin)) { throw 'Existing application failed identity or health checks.' }
+    if ((!$process.CommandLine.Contains($Entry) -and !$process.CommandLine.Contains($LegacyEntry)) -or !(Test-Health $LocalOrigin)) { throw 'Existing application failed identity or health checks.' }
     $appProcessId = $runtime.appPid
   } else {
     $pythonOutput = & conda run -n agent python -c 'import sys; print(sys.executable)'

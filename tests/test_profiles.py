@@ -4,7 +4,7 @@ import struct
 import zlib
 
 from fastapi.testclient import TestClient
-import test_app
+from tests import test_app
 
 
 def png(width=320,height=320,color=(230,170,70),metadata=False,pixels=None):

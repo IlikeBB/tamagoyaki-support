@@ -16,7 +16,7 @@ class RendezvousTest(unittest.TestCase):
         cls.temp = tempfile.TemporaryDirectory()
         os.environ["TAMAGO_DB"] = cls.temp.name + "/test.sqlite3"
         os.environ["TAMAGO_ORIGIN"] = "http://127.0.0.1:8078"
-        cls.module = importlib.import_module("app")
+        cls.module = importlib.import_module("backend.app")
         cls.original_db = cls.module.DB
         cls.module.DB = Path(cls.temp.name) / 'test.sqlite3'
         cls.ctx = TestClient(cls.module.app)

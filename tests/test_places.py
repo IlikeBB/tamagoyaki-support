@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 from urllib.error import URLError
 from fastapi import HTTPException
-from places import Places
+from backend.places import Places
 
 VENUES=[{'id':'k-arena','name':'Kアリーナ横浜','short':'K 橫','lat':35.4645775,'lng':139.6306334}]
 def result(name='台北101',lng=121.5645,lat=25.034):
@@ -18,7 +18,7 @@ class PlacesTest(unittest.TestCase):
         self.search=Places(VENUES,'https://example.test')
 
     def test_curated_venue_alias_uses_verified_point_without_external_request(self):
-        with patch('places.urlopen') as fetch:
+        with patch('backend.places.urlopen') as fetch:
             for query in ['K橫','K arena yokohama','Ｋアリーナ横浜']:
                 point=self.search.search(query)[0]
                 self.assertEqual(point['lat'],VENUES[0]['lat'])
@@ -26,7 +26,7 @@ class PlacesTest(unittest.TestCase):
             fetch.assert_not_called()
 
     def test_utf8_query_cache_identity_and_no_gps(self):
-        with patch('places.urlopen',return_value=response([result()])) as fetch:
+        with patch('backend.places.urlopen',return_value=response([result()])) as fetch:
             first=self.search.search('  台北101 ')
             self.assertEqual(first,self.search.search('台北101'))
             fetch.assert_called_once()
@@ -38,14 +38,14 @@ class PlacesTest(unittest.TestCase):
             self.assertEqual(first[0]['lng'],121.5645)
 
     def test_upstream_throttle_lock_and_error_recovery(self):
-        with patch('places.urlopen',return_value=response([])) as fetch:
+        with patch('backend.places.urlopen',return_value=response([])) as fetch:
             self.assertEqual(self.search.search('無結果'),[])
             with self.assertRaises(HTTPException) as error:
                 self.search.search('不同地點')
             self.assertEqual(error.exception.status_code,429)
             fetch.assert_called_once()
         self.search.last_request=-100
-        with patch('places.urlopen',side_effect=URLError('private upstream detail')):
+        with patch('backend.places.urlopen',side_effect=URLError('private upstream detail')):
             with self.assertRaises(HTTPException) as error:
                 self.search.search('連線故障')
             self.assertEqual(error.exception.status_code,503)

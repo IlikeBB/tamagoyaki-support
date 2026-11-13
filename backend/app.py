@@ -18,16 +18,16 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.exception_handlers import request_validation_exception_handler
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import Literal
-from accounts import Accounts, client_address
-from friends import Friends
-from places import Places
-from assistance import Assistance
-from chat import Chat
-from reputation import Reputation
-from profile_media import ProfileMedia
-from profiles import Profiles
+from .accounts import Accounts, client_address
+from .friends import Friends
+from .places import Places
+from .assistance import Assistance
+from .chat import Chat
+from .reputation import Reputation
+from .profile_media import ProfileMedia
+from .profiles import Profiles
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 DB = Path(os.environ.get("TAMAGO_DB", str(ROOT / "data" / "tamagoyaki.sqlite3")))
 PUBLIC_ORIGIN = os.environ.get("TAMAGO_ORIGIN", "http://127.0.0.1:8078")
 SESSION_DAYS = 30

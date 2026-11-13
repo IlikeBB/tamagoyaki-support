@@ -13,7 +13,7 @@ class MapConfigurationTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         global app
-        import app
+        from backend import app
         cls.folder = tempfile.TemporaryDirectory()
         cls.original_db = app.DB
         app.DB = Path(cls.folder.name) / 'maps-test.sqlite3'

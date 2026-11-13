@@ -2,6 +2,16 @@
 
 手機優先的遠征會合網頁。Python FastAPI、SQLite，前端使用原生 JavaScript 與自架 Leaflet 1.9.4。正式網址：https://tamagoyaki-support.modoubletw.com/
 
+## 專案結構
+
+- `backend/`：Python 後端、資料存取與啟動入口。
+- `tests/`：Python 單元與整合測試。
+- `static/`：網頁介面、樣式、圖示及地圖資源。
+- `scripts/`：部署腳本與瀏覽器驗證工具。
+- `assets/`：地圖原始素材。
+
+`data/`、`.run-logs/`、`artifacts/` 與本機設定檔保留在專案根目錄，並由 Git 忽略。
+
 ## 使用方式
 
 1. 按右上「登入」→「註冊帳號」，設定登入名稱、密碼與顯示暱稱；再按「開始組隊」建立活動遠征隊或輸入邀請碼。
@@ -31,7 +41,7 @@
 git clone https://github.com/IlikeBB/tamagoyaki-support.git
 cd tamagoyaki-support
 conda run -n agent python -m pip install -r requirements-tested.txt
-conda run --no-capture-output -n agent python server.py
+conda run --no-capture-output -n agent python -m backend.server
 ```
 
 本機網址為 `http://127.0.0.1:8078`。正式部署沿用 CozyPad 的本機服務＋Cloudflare Tunnel 方式，但使用獨立 Tunnel，不會重啟 CozyPad。
@@ -122,7 +132,7 @@ iPhone／iPad 主畫面模式（`navigator.standalone`）使用 `100vh` 作為�
 長按地圖約 0.6 秒（電腦也可按右鍵），可在選定位置插旗或建立臨時地標。旗標不隨發布者的 GPS 移動，座標仍只有接取者可見；臨時地標可選 2、6 或 24 小時。建立者與目前遠征隊的建立者（管理員／隊長）可刪除地標，伺服器會檢查權限。方向卡顯示在地圖左下側，位於定位設定卡下方。
 
 ```powershell
-conda run -n agent python -m unittest test_app test_maps test_friends test_places test_assistance.AssistanceTest test_chat.ChatTest test_profiles.ProfilesTest test_expedition_admin.ExpeditionAdminTest -v
+conda run -n agent python -m unittest discover -s tests -t . -v
 npm ci --ignore-scripts
 # 在獨立 QA 資料庫的本機伺服器執行；勿對正式網址跑會寫入資料的測試
 $env:QA_ORIGIN = 'http://127.0.0.1:8079'
