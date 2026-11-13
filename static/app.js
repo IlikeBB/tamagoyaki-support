@@ -136,9 +136,9 @@ function renderVenueControl(){
   select.value=venue().id;select.title='切換地圖場館：'+venue().name;
   $('#map-caption-text').textContent=venue().name;
 }
-function showPositionOnMap(point){
+function showPositionOnMap(point,options){
   if(!validMapPoint(point))return;
-  showMap();if(map)map.setView([point.lat,point.lng],Math.max(map.getMinZoom(),17));
+  showMap();if(map)map.setView([point.lat,point.lng],Math.max(map.getMinZoom(),17),options);
 }
 function focusVenue(){
   if(map)map.setView([venue().lat,venue().lng],16,{animate:false});
@@ -201,6 +201,7 @@ function renderMap(){
   const sharedOwners=new Set(sharedPoints.map(p=>p.owner)),helpOwners=new Set();
   visibleTeammateKey=guidanceKey();
   layers.clearLayers();
+  config.venues.filter(validMapPoint).forEach(v=>marker(v,`<div class="venue-map-point ${v.id===state.activeVenue?'is-current':''}"><div class="map-pin venue">${icon('ticket')}</div><span>${esc(v.short)}</span></div>`,`${v.name} · 場館地標`,()=>selectTarget('venue',v.id)));
   if(placeSearch?.selected&&validMapPoint(placeSearch.selected))marker(placeSearch.selected,`<div class="map-pin blue search-result-marker">${icon('search')}</div>`,`${placeSearch.selected.name} · 搜尋結果`,()=>placeSearch.showSelected());
   state.pins.filter(validMapPoint).filter(p=>!pinFilters||pinFilters.matches(p)).forEach(p=>{
     const html=p.kind==='message'?`<div class="ground-message-marker"><span>${icon('message')}</span><small>留言</small></div>`:`<div class="map-pin blue">${icon(p.kind==='shop'?'shop':'pin')}</div>`;
@@ -276,6 +277,7 @@ function refreshTeammateGuidance(){
 }
 function targetPoint(){
   const t=state.target;if(!t)return null;
+  if(t.type==='venue'){const v=config.venues.find(v=>v.id===t.id);return v?{...v,title:v.name,mode:'場館地標'}:null;}
   if(t.type==='task'){
     const task=state.tasks.find(x=>x.id===t.id);
     if(!task||!['open','accepted'].includes(task.status)||!task.location_visible||task.lat==null||LocationState.moving(task)&&!LocationState.valid(task.located))return null;
@@ -313,13 +315,17 @@ function renderTarget(){
   if(withBoard)landmarkReports?.mount(el.querySelector('.landmark-report-board'),{eid:state.room.id,pid:target.id});else landmarkReports?.detach();
 }
 function selectTarget(type,id){
+  if(type==='venue'){
+    if(!config.venues.some(v=>v.id===id))return;
+    state.activeVenue=id;state.activityVenue=id;rememberVenue();renderVenueControl();
+  }
   if(type==='pin'){const pin=state.pins.find(item=>item.id===id);if(pin)pinFilters?.reveal(pin);}
   if(['task','friend','member'].includes(type)&&navigationTargets().some(t=>t.id===id)){
     state.target=null;renderTarget();finder.open(id);showFinderTaskOnMap(id);return;
   }
   state.target={type,id};const p=targetPoint();
   if(!p){state.target=null;renderTarget();return toast('接取任務後，才會取得發布者座標。');}
-  showPositionOnMap(p);renderMap();
+  showPositionOnMap(p,type==='venue'?{animate:false}:undefined);renderMap();
 }
 function render(){
   chatFriend?.identity();chat?.identity();profilePage?.identity();expeditionPreview?.sync();expeditionManagement?.sync();siteAccountAdmin?.sync();roomSettings?.sync();memberActions?.sync();pinReview?.sync();blockedPeople?.sync();roomAdmission?.sync();syncNewsFriends();

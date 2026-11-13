@@ -423,12 +423,13 @@ class RendezvousTest(unittest.TestCase):
         self.assertEqual(second.post("/api/auth/login",json={"username":self.usernames[0],"password":self.password}).status_code,401)
         self.assertEqual(second.post("/api/auth/login",json={"username":self.usernames[0],"password":"Another strong passphrase 2026!"}).status_code,200)
 
-    def test_country_activity_choices_support_creation_join_and_history(self):
+    def test_activity_choices_support_creation_join_and_history(self):
         created={}
-        for vid,label in (('taiwan','台灣'),('japan','日本')):
+        choices=(('taiwan','台灣'),('japan','日本'),('tokyo-dome-city','東京巨蛋城（Kanadevia Hall）'))
+        for vid,label in choices:
             response=self.a.post('/api/expeditions',json={'name':label+'活動隊伍','venue':vid,'event_date':self.room['event_date']})
             self.assertEqual(response.status_code,200);created[vid]=response.json()
-        for vid,label in (('taiwan','台灣'),('japan','日本')):
+        for vid,label in choices:
             room=created[vid]
             catalogue=self.b.get('/api/venues/'+vid+'/expeditions').json()['expeditions']
             self.assertIn(room['id'],[r['id'] for r in catalogue])
