@@ -43,7 +43,7 @@ let mapActions=null;
 let placeSearch=null;
 let assistance=null;
 let appDisplay=null;
-let chat=null;
+let chat=null,squadInvites=null;
 let profilePage=null,landmarkFeedback=null,taskFeedback=null,news=null,chatFriend=null,groundMessages=null;
 let locationCardDismissed=false;
 let centerOnLocationFix=true;
@@ -507,11 +507,11 @@ async function logout(){
 function showJoin(mode='browse'){
   if(mode==='join')mode='browse';
   if(!state.authenticated){authIntent={kind:'join',mode};return showAuth();}
-  const params=new URLSearchParams(location.search);
+  const params=new URLSearchParams(location.search),squadInvitation=mode==='code'&&/^[A-Za-z0-9]{8}$/.test(params.get('squad')||'');
   const options=activityVenues().map(v=>`<option value="${v.id}" ${v.id===activityVenue()?'selected':''}>${esc(v.name)}</option>`).join('');
   const tabs=`<div class="form-tabs"><button data-action="join-mode" class="${mode==='browse'?'active':''}">場館遠征隊</button><button data-action="create-mode" class="${mode==='create'?'active':''}">建立遠征隊</button><button data-action="code-mode" class="${mode==='code'?'active':''}">邀請碼</button></div>`;
   const title=mode==='create'?'號召同一場的夥伴。':mode==='code'?'用邀請碼加入。':'加入這一場的遠征隊。';
-  const intro=`<h2>${title}</h2><p>隊員彼此不會看到座標；大家都能發布任務，分享現場情報。</p>${tabs}`;
+  const intro=`<h2>${squadInvitation?'接受小隊邀請。':title}</h2><p>隊員彼此不會看到座標；大家都能發布任務，分享現場情報。</p>${squadInvitation?'<p class="field-note">僅限與小隊內目前成員互為好友的人加入。確認後會加入邀請的遠征隊及小隊；若已有其他分組，將切換小隊並關閉原有的遠征隊／任務定位分享。好友分享及求助定位不受影響。</p>':''}${tabs}`;
   if(mode==='browse'){
     dialog(`${intro}<label for="join-venue">選擇活動會場</label><select id="join-venue">${options}</select><div id="venue-catalog" aria-live="polite"><p class="field-note">正在載入遠征隊…</p></div><button class="button primary full" data-action="create-mode">＋ 建立這個場館的遠征隊</button>${!state.demo?`<button class="button outline full" data-action="manage-squads">遠征隊內的小隊組合</button>`:''}<button class="button outline full" data-action="owned-rooms">管理我建立的遠征隊</button>`);
     let generation=0;
@@ -537,7 +537,7 @@ function showJoin(mode='browse'){
   $('#join-form').onsubmit=async event=>{
     event.preventDefault();await submit(event.target,async()=>{
       const f=new FormData(event.target);
-      const room=mode==='code'?await api('/join','POST',{code:f.get('code').toUpperCase()}):await api('/expeditions','POST',{name:f.get('name'),venue:f.get('venue'),event_date:f.has('include_date')?f.get('event_date'):null,discoverable:f.has('discoverable')});
+      const room=mode==='code'?await api('/join','POST',{code:f.get('code').toUpperCase(),...(squadInvitation?{squad_code:params.get('squad').toUpperCase()}:{})}):await api('/expeditions','POST',{name:f.get('name'),venue:f.get('venue'),event_date:f.has('include_date')?f.get('event_date'):null,discoverable:f.has('discoverable')});
       await finishRoomJoin(room,mode==='create');
     });
   };
@@ -545,10 +545,10 @@ function showJoin(mode='browse'){
 async function finishRoomJoin(room,created){
   const params=new URLSearchParams(location.search);
   await enterRoom(room,state.user);
-  const squadCode=params.get('squad');
-  if(squadCode){try{await api(`/expeditions/${room.id}/squads/join`,'POST',{code:squadCode});await refresh();}catch(error){toast(error.message);}}
+  const squadCode=params.get('squad');let squadError=null;
+  if(squadCode&&!room.squad_joined){try{await api(`/expeditions/${room.id}/squads/join`,'POST',{code:squadCode});await refresh();}catch(error){squadError=error.message;}}
   closeDialog();showMap();history.replaceState(null,'',location.pathname);
-  toast('已加入遠征隊，可在定位設定選擇分享對象。');
+  toast(squadError?'已加入遠征隊；小隊未加入：'+squadError:squadCode?'已加入遠征隊與小隊，可在定位設定選擇分享對象。':'已加入遠征隊，可在定位設定選擇分享對象。');
   if(created&&!room.discoverable)showInvite();
 }
 async function submit(form,fn){
@@ -590,7 +590,8 @@ async function refresh({fresh=false}={}){
 function showInvite(squad=false){
   if(state.demo)return showJoin('create');const s=squad?currentSquad():state.room;if(!s)return;
   const url=location.origin+'/?join='+state.room.code+(squad?'&squad='+s.code:'');
-  dialog(`<h2>${squad?'你的小隊，等你集合。':'把邀請碼交給夥伴。'}</h2><p>${esc(s.name)} · ${squad?'小隊邀請碼':'遠征隊邀請碼'}</p><div class="invite-code">${esc(s.code)}</div><div class="invite-url">${esc(url)}</div><p class="field-note">邀請連結持有人可加入遠征隊並查看隊內任務。請只分享給同行夥伴。</p><button class="button primary full" data-action="copy" data-copy="${esc(url)}">複製邀請連結 ${icon('link')}</button>`);
+  dialog(`<h2>${squad?'你的小隊，等你集合。':'把邀請碼交給夥伴。'}</h2><p>${esc(s.name)} · ${squad?'小隊邀請碼':'遠征隊邀請碼'}</p><div class="invite-code">${esc(s.code)}</div><div class="invite-url">${esc(url)}</div><p class="field-note">${squad?'小隊僅限好友加入；即使取得連結，非好友也無法加入小隊。':'邀請連結持有人可加入遠征隊並查看隊內任務。請只分享給同行夥伴。'}</p><button class="button primary full" data-action="copy" data-copy="${esc(url)}">複製邀請連結 ${icon('link')}</button>${squad?'<section id="squad-invite-friends"></section>':''}`);
+  if(squad)squadInvites.mount($('#squad-invite-friends'),{eid:state.room.id,sid:s.id,user:state.user.id});
 }
 function showRooms(){
   if(state.demo)return showJoin();
@@ -599,7 +600,7 @@ function showRooms(){
 function showSquad(mode){
   if(state.demo)return showJoin();
   const create=mode==='create',roomId=state.room.id,userId=state.user.id;
-  dialog(`<h2>${create?'小隊集合！':'加入同行小隊。'}</h2><p>每人在同一遠征隊中同時加入一個小隊。建立或加入新小隊會切換分組，並關閉原有的遠征隊／任務定位分享；好友分享及求助定位不受影響。</p><form id="squad-form"><label for="squad-value">${create?'小隊名稱':'小隊邀請碼'}</label><input id="squad-value" name="value" required maxlength="${create?30:8}" ${create?'':'minlength="8" pattern="[A-Za-z0-9]{8}"'} placeholder="${create?'例如：玉子燒小隊':'8 位小隊邀請碼'}"><div class="form-error" role="alert"></div><button class="button primary full" type="submit">${create?'建立小隊':'加入小隊'}</button></form>`);
+  dialog(`<h2>${create?'小隊集合！':'加入同行小隊。'}</h2><p>小隊僅限好友加入，需與其中一位目前成員互為好友。每人在同一遠征隊中同時加入一個小隊。建立或加入新小隊會切換分組，並關閉原有的遠征隊／任務定位分享；好友分享及求助定位不受影響。</p><form id="squad-form"><label for="squad-value">${create?'小隊名稱':'小隊邀請碼'}</label><input id="squad-value" name="value" required maxlength="${create?30:8}" ${create?'':'minlength="8" pattern="[A-Za-z0-9]{8}"'} placeholder="${create?'例如：玉子燒小隊':'8 位小隊邀請碼'}"><div class="form-error" role="alert"></div><button class="button primary full" type="submit">${create?'建立小隊':'加入小隊'}</button></form>`);
   $('#squad-form').onsubmit=async e=>{e.preventDefault();await submit(e.target,async()=>{
     if(state.demo||state.room.id!==roomId||state.user.id!==userId)throw new Error('遠征隊已變更，請重新開啟小隊設定。');
     const value=new FormData(e.target).get('value');await stopTeamLocation();
@@ -950,6 +951,7 @@ async function init(){
   profilePage=new ProfileClient($('#profile-dialog'),{api,toast,user:()=>state.authenticated?state.user:null,login:uid=>{authIntent={kind:'profile',uid};showAuth();},settings:showAccount,expired:()=>friends?.actions.expired(),updated:profile=>{state.user={...state.user,...profile};render();},room:id=>openProfileRoom(id),pin:(eid,pid)=>openProfileRoom(eid,pid),taskRoom:async eid=>{await openProfileRoom(eid);setTab('tasks');},removeRoom:id=>showDeleteRoom(id)});
   landmarkFeedback=new LandmarkFeedback({api,toast,context:()=>({eid:state.room.id,user:state.user.id,pins:state.pins}),committed:()=>{pinRevision++;},changed:()=>render()});
   taskFeedback=new TaskFeedback({api,toast,context:()=>({eid:state.room.id,user:state.user.id,tasks:state.tasks}),committed:()=>{taskRevision++;},changed:()=>render()});
+  squadInvites=new SquadInvites({api,context:()=>!state.demo&&state.authenticated&&currentSquad()?{user:state.user.id,eid:state.room.id,sid:state.mine.squad}:null,sent:()=>chat?.tick()});
   appDisplay=new AppDisplay({dialog,close:closeDialog,toast});
   chat=new ChatClient($('#chat-dialog'),{api,toast,user:()=>state.authenticated?state.user:null,login:()=>{authIntent={kind:'chat'};showAuth();},expired:()=>friends?.actions.expired(),person:id=>chatFriend.open(id)});
   mapActions=new MapActions($('#map'),$('#map-actions'),{

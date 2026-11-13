@@ -100,6 +100,21 @@ class Chat:
         message['sender_avatar_url']=f"/api/profiles/{message['sender']}/media/avatar?v={digest}" if digest else None
         return message
 
+    def send_message(self,c,uid,kind,target,body,client_id):
+        """Caller holds the write transaction; every retry rechecks authorization."""
+        thread=self.authorize(c,uid,kind,target)
+        previous=c.execute('SELECT * FROM chat_messages WHERE sender=? AND client_id=?',(uid,client_id)).fetchone()
+        if previous:
+            if (previous['kind'],previous['thread'],previous['body'])!=(kind,thread,body):
+                raise HTTPException(409,'這則訊息的重試內容已改變，請重新傳送。')
+            return self.message(c,previous['id'])
+        stamp=int(time.time())
+        if c.execute('SELECT COUNT(*) FROM chat_messages WHERE sender=? AND created>?',(uid,stamp-60)).fetchone()[0]>=60:
+            raise HTTPException(429,'訊息傳送太快，請稍後再試。',headers={'Retry-After':'60'})
+        mid=c.execute('INSERT INTO chat_messages(kind,thread,sender,body,client_id,created) VALUES(?,?,?,?,?,?)',
+                      (kind,thread,uid,body,client_id,stamp)).lastrowid
+        return self.message(c,mid)
+
     def install(self, app):
         @app.get('/api/chat')
         def conversations(request: Request):
@@ -162,22 +177,9 @@ class Chat:
         @app.post('/api/chat/{kind}/{target}/messages')
         def send(kind: ChatKind, target: str, body: ChatMessage, request: Request):
             uid = self.accounts.current_user(request)['id']
-            stamp = int(time.time())
             with self.connect() as c:
                 c.execute('BEGIN IMMEDIATE')
-                thread = self.authorize(c, uid, kind, target)
-                previous = c.execute('SELECT * FROM chat_messages WHERE sender=? AND client_id=?',
-                                     (uid, body.client_id)).fetchone()
-                if previous:
-                    if (previous['kind'], previous['thread'], previous['body']) != (kind, thread, body.body):
-                        raise HTTPException(409, '這則訊息的重試內容已改變，請重新傳送。')
-                    return self.message(c, previous['id'])
-                count = c.execute('SELECT COUNT(*) FROM chat_messages WHERE sender=? AND created>?', (uid, stamp-60)).fetchone()[0]
-                if count >= 60:
-                    raise HTTPException(429, '訊息傳送太快，請稍後再試。', headers={'Retry-After': '60'})
-                mid = c.execute('INSERT INTO chat_messages(kind,thread,sender,body,client_id,created) VALUES(?,?,?,?,?,?)',
-                                (kind, thread, uid, body.body, body.client_id, stamp)).lastrowid
-                return self.message(c, mid)
+                return self.send_message(c,uid,kind,target,body.body,body.client_id)
 
         @app.post('/api/chat/{kind}/{target}/read')
         def read(kind: ChatKind, target: str, body: ChatRead, request: Request):

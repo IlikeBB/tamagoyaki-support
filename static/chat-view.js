@@ -86,6 +86,8 @@ class ChatView {
       const time=document.createElement('time');time.dateTime=new Date(message.created*1000).toISOString();time.textContent=new Intl.DateTimeFormat('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}).format(message.created*1000);meta.append(name,time);
       const body=document.createElement('p');body.textContent=message.body;
       const copy=document.createElement('div');copy.className='chat-message-copy';copy.append(meta,body);
+      const invitation=SquadInvites.invitationURL(message.body,location.origin,config?.public_origin);
+      if(invitation){const link=document.createElement('a');link.className='chat-squad-invite';link.href=invitation;link.textContent='查看小隊邀請 →';copy.append(link);}
       const portrait=document.createElement(message.sender===uid?'span':'button');portrait.className='chat-message-avatar';
       if(message.sender!==uid){portrait.type='button';portrait.dataset.chatPerson=message.sender;portrait.setAttribute('aria-label','查看 '+message.sender_name+' 的好友邀請選項');}
       this.portrait(portrait,message.sender_name,message.sender_avatar_url);

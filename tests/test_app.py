@@ -127,6 +127,8 @@ class RendezvousTest(unittest.TestCase):
         self.assertTrue(all(m['lat'] is None and m['lng'] is None for m in self.snapshot(self.b)['members']))
 
     def test_task_only_location_visibility_and_revocation(self):
+        self.a.post('/api/friends/requests',json={'username':self.usernames[1]})
+        self.b.post('/api/friends/'+self.users[0]['id']+'/accept')
         squad=self.a.post(self.path+"/squads",json={"name":"同行小隊"}).json()
         other_squad=self.snapshot(self.c)["squads"][0]
         self.assertNotIn("code",other_squad)

@@ -13,6 +13,7 @@ try{
  }
  const [a,b,c]=users,room=await api(a,'/expeditions','POST',{name:'遠征隊小隊組合 '+suffix,venue:'taiwan'}),path='/expeditions/'+room.id;
  for(const person of [b,c])await api(person,'/join','POST',{code:room.code});
+ for(const person of [b,c]){await api(a,'/friends/requests','POST',{username:person.user.username});await api(person,'/friends/'+a.user.id+'/accept','POST');}
  for(const person of users){await person.page.goto(origin);await expect.poll(()=>person.page.evaluate(()=>state.authenticated&&!state.demo&&friends.ready()),{timeout:20000}).toBe(true);await person.page.evaluate(()=>clearInterval(pollTimer));}
  await a.page.locator('.header-actions [data-action=join]').click();await a.page.locator('[data-action=manage-squads]').click();await expect(a.page.locator('.squad-overview')).toBeVisible();await expect(a.page.locator('.squad-intro')).toContainText('尚未加入小隊');
  let release,seen;const gate=new Promise(resolve=>release=resolve),received=new Promise(resolve=>seen=resolve);let once=true;
@@ -35,7 +36,6 @@ try{
   const box=await a.page.locator('.squad-overview').boundingBox();expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(width);
   if(width===390||width===1440){await a.page.locator('#panel-content').evaluate(node=>node.scrollTop=0);await a.page.screenshot({path:`artifacts/squad-compositions-${width}.png`});}
  }
- await api(a,'/friends/requests','POST',{username:b.user.username});await api(b,'/friends/'+a.user.id+'/accept','POST');
  await api(a,'/friends/location','PUT',{lat:25.033,lng:121.5654,accuracy:10});await a.page.evaluate(()=>friends.sync());
  expect(await a.page.evaluate(()=>friends.sharing)).toBe(false);expect(await a.page.evaluate(()=>friends.data.sharing)).toBe(true);
  await a.page.setViewportSize({width:390,height:844});await a.page.locator('.squad-overview [data-action=join-squad]').click();await a.page.locator('#squad-value').fill(second.code);await a.page.locator('#squad-form [type=submit]').click();await expect(a.page.locator('#dialog')).toBeHidden();await expect(a.page.locator('.squad-group.is-current h3')).toHaveText('物販小隊');

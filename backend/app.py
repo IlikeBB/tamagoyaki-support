@@ -26,6 +26,7 @@ from .reputation import Reputation
 from .profile_media import ProfileMedia
 from .profiles import Profiles
 from .task_feedback import TaskFeedback
+from .squad_invites import SquadInvites
 
 ROOT = Path(__file__).resolve().parents[1]
 DB = Path(os.environ.get("TAMAGO_DB", str(ROOT / "data" / "tamagoyaki.sqlite3")))
@@ -90,6 +91,7 @@ accounts = Accounts(connect, PUBLIC_ORIGIN, SESSION_DAYS)
 assistance = Assistance(connect, accounts, LOCATION_TTL_SECONDS)
 friends = Friends(connect, accounts, LOCATION_TTL_SECONDS, help_required=assistance.required, fresh_seconds=LIVE_SECONDS)
 chat = Chat(connect, accounts)
+squad_invites = SquadInvites(connect,accounts,chat,PUBLIC_ORIGIN)
 reputation = Reputation(connect, accounts)
 task_feedback = TaskFeedback(connect, accounts)
 profile_media = ProfileMedia(connect, accounts)
@@ -197,6 +199,7 @@ accounts.install(app)
 friends.install(app)
 assistance.install(app)
 chat.install(app)
+squad_invites.install(app)
 reputation.install(app)
 task_feedback.install(app)
 profile_media.install(app)
@@ -285,6 +288,10 @@ class Join(Input):
     code: str = Field(min_length=6, max_length=12, pattern=r"^[A-Za-z0-9]+$")
 
 
+class ExpeditionJoin(Join):
+    squad_code: str | None = Field(default=None,min_length=8,max_length=8,pattern=r'^[A-Za-z0-9]+$')
+
+
 class SquadInput(Input):
     name: str = Field(min_length=1, max_length=30)
 
@@ -340,7 +347,7 @@ def health():
 
 @app.get("/api/config")
 def config():
-    return {"venues": VENUES, "activity_venues": ACTIVITY_VENUES, "location_ttl": LOCATION_TTL_SECONDS, "location_fresh_seconds": LIVE_SECONDS, "poll_seconds": 5, "tile_url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png", "maps": map_settings()}
+    return {"public_origin": PUBLIC_ORIGIN, "venues": VENUES, "activity_venues": ACTIVITY_VENUES, "location_ttl": LOCATION_TTL_SECONDS, "location_fresh_seconds": LIVE_SECONDS, "poll_seconds": 5, "tile_url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png", "maps": map_settings()}
 
 
 @app.get('/api/places/search')
@@ -450,16 +457,24 @@ def join_public_expedition(eid: str, request: Request):
 
 
 @app.post("/api/join")
-def join(body: Join, request: Request):
+def join(body: ExpeditionJoin, request: Request):
     u = user(request)
     with connect() as c:
         c.execute('BEGIN IMMEDIATE')
         room = c.execute("SELECT * FROM expeditions WHERE code=?", (body.code.upper(),)).fetchone()
         if room is None:
             raise HTTPException(404, "找不到這個邀請碼，請向隊長確認。")
+        squad=None
+        if body.squad_code:
+            squad=c.execute('SELECT * FROM squads WHERE expedition=? AND code=?',(room['id'],body.squad_code.upper())).fetchone()
+            if squad is None:raise HTTPException(404,'找不到這個小隊邀請碼，可能已經解散。')
+            squad_invites.authorize_join(c,u['id'],room['id'],squad['id'])
         c.execute("INSERT OR IGNORE INTO members(user,expedition,seen) VALUES(?,?,?)", (u["id"], room["id"], now()))
         profiles.joined(c,u['id'],room['id'])
-    return dict(room)
+        if squad:
+            c.execute("UPDATE members SET squad=?,scope='off',lat=NULL,lng=NULL,accuracy=NULL,located=NULL WHERE user=? AND expedition=?",(squad['id'],u['id'],room['id']))
+            prune_empty_squads(c,room['id'])
+    return {**dict(room),**({'squad_joined':True} if squad else {})}
 
 
 @app.get("/api/expeditions/{eid}")
@@ -562,6 +577,7 @@ def join_squad(eid: str, body: Join, request: Request):
         s = c.execute("SELECT * FROM squads WHERE expedition=? AND code=?", (eid,body.code.upper())).fetchone()
         if s is None:
             raise HTTPException(404, "找不到這個小隊邀請碼。")
+        squad_invites.authorize_join(c,u['id'],eid,s['id'])
         c.execute("UPDATE members SET squad=?,scope='off',lat=NULL,lng=NULL,accuracy=NULL,located=NULL WHERE user=? AND expedition=?", (s["id"],u["id"],eid))
         prune_empty_squads(c,eid)
     return dict(s)

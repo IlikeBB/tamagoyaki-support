@@ -4,6 +4,12 @@ from tests import test_app
 
 
 class SquadsTest(test_app.RendezvousTest):
+    def setUp(self):
+        super().setUp()
+        for index in (1,2):
+            self.a.post('/api/friends/requests',json={'username':self.usernames[index]})
+            self.clients[index].post('/api/friends/'+self.users[0]['id']+'/accept')
+
     def create(self,client,name):
         result=client.post(self.path+'/squads',json={'name':name})
         self.assertEqual(result.status_code,200);return result.json()

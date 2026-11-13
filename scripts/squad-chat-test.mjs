@@ -12,6 +12,7 @@ try{
  }
  const [a,b,c]=users,room=await api(a,'/expeditions','POST',{name:'幕張同行遠征隊 '+suffix,venue:'makuhari'}),path='/expeditions/'+room.id;
  for(const person of [b,c])await api(person,'/join','POST',{code:room.code});
+ for(const person of [b,c]){await api(a,'/friends/requests','POST',{username:person.user.username});await api(person,'/friends/'+a.user.id+'/accept','POST');}
  for(const person of users){await person.page.goto(origin);await expect.poll(()=>person.page.evaluate(()=>state.authenticated&&!state.demo&&chat.owner===state.user.id),{timeout:20000}).toBe(true);await person.page.evaluate(()=>clearInterval(pollTimer));}
  await a.page.locator('.mobile-tabs [data-tab=members]').click();await a.page.locator('[data-action=create-squad]').click();await a.page.locator('#squad-value').fill('南口集合小隊');await a.page.locator('#squad-form [type=submit]').click();await expect(a.page.locator('#dialog')).toBeHidden();
  const first=(await api(a,path)).squads[0];expect(await a.page.evaluate(id=>chat.contacts.some(contact=>contact.id==='squad:'+id),first.id)).toBe(true);

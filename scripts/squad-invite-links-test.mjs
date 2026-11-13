@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import {readFile} from 'node:fs/promises';
+const source=await readFile(new URL('../static/squad-invites.js',import.meta.url),'utf8'),context={URL,location:{origin:'https://example.test'}};
+vm.runInNewContext(source+';globalThis.Invites=SquadInvites;',context);
+const valid='https://example.test/?join=ROOM1234&squad=TEAM5678';
+const credentialed=new URL(valid);credentialed.username='user';credentialed.password='password';
+assert.equal(context.Invites.invitationURL('邀請你加入！\n'+valid),valid);
+assert.equal(context.Invites.invitationURL('https://public.example/?squad=TEAM5678&join=ROOM1234','http://127.0.0.1:8078','https://public.example'),'https://public.example/?squad=TEAM5678&join=ROOM1234');
+for(const url of [valid.replace('example.test','evil.test'),valid.replace('example.test','example.test.evil.test'),valid.replace('https://','javascript:'),valid+'&next=https://evil.test',valid+'&join=AAAA1111',valid+'#extra',valid.replace('/?','/login?'),valid.replace('ROOM1234','<img>'),credentialed.toString(),'/??join=ROOM1234&squad=TEAM5678'])assert.equal(context.Invites.invitationURL(url),null,url);
+console.log(JSON.stringify({ok:true,strictSameSiteInvitations:true,canonicalPublicOrigin:true,externalAndMalformedLinksRejected:true}));
