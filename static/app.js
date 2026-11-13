@@ -580,7 +580,7 @@ function showSquad(mode){
     if(state.demo||state.room.id!==roomId||state.user.id!==userId)throw new Error('遠征隊已變更，請重新開啟小隊設定。');
     const value=new FormData(e.target).get('value');await stopTeamLocation();
     if(state.demo||state.room.id!==roomId||state.user.id!==userId||!e.target.isConnected)throw new Error('遠征隊或視窗已變更，請重新開啟。');
-    await api(`/expeditions/${roomId}/squads${create?'':'/join'}`,'POST',create?{name:value}:{code:value.toUpperCase()});await refresh({fresh:true});
+    await api(`/expeditions/${roomId}/squads${create?'':'/join'}`,'POST',create?{name:value}:{code:value.toUpperCase()});await refresh({fresh:true});await chat?.sync({fresh:true});
     if(state.room.id!==roomId||state.user.id!==userId||!e.target.isConnected)return;
     closeDialog();setTab('members');toast(create?'小隊已建立，使用「邀請加入小隊」分享邀請碼。':'已加入小隊，可用地圖「隊友」篩選查看已授權的位置。');
   });};
@@ -590,7 +590,7 @@ async function leaveSquad(id){
   const roomId=state.room.id,userId=state.user.id;
   await stopTeamLocation();
   if(state.room.id!==roomId||state.user.id!==userId)return;
-  await api(`/expeditions/${roomId}/squads/${encodeURIComponent(id)}/membership`,'DELETE');await refresh({fresh:true});
+  await api(`/expeditions/${roomId}/squads/${encodeURIComponent(id)}/membership`,'DELETE');await refresh({fresh:true});await chat?.sync({fresh:true});
   if(state.room.id===roomId&&state.user.id===userId){setTab('members');toast('已離開小隊，仍保留遠征隊成員資格。');}
 }
 function showPublish(type='task',point){
@@ -807,6 +807,7 @@ document.addEventListener('click',async e=>{
     else if(action==='confirm-delete-room'){b.disabled=true;try{await deleteRoom(id);}finally{b.disabled=false;}}
     else if(action==='invite')showInvite();
     else if(action==='squad-invite')showInvite(true);
+    else if(action==='squad-chat'&&!state.demo&&state.mine.squad===id)await chat.open('squad',id);
     else if(action==='manage-squads'){closeDialog();setTab('members');}
     else if(action==='leave-squad'){b.disabled=true;try{await leaveSquad(id);}finally{b.disabled=false;}}
     else if(action==='help')help();

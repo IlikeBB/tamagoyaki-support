@@ -17,9 +17,9 @@ class ChatClient {
     if(error.status===401){this.actions.expired();this.identity();return;}
     this.view.status(navigator.onLine?'聊天暫時無法同步':'離線 · 連線後重新同步',true);this.view.error(error.message);
   }
-  async sync(){
+  async sync({fresh=false}={}){
     if(!this.identity()||document.hidden)return;
-    if(this.syncing)return this.syncing;
+    if(this.syncing){await this.syncing;if(fresh)return this.sync();return;}
     const generation=this.generation;
     this.syncing=(async()=>{
     try{
@@ -27,7 +27,9 @@ class ChatClient {
       this.contacts=data.conversations;this.view.badge(data.unread);this.view.status('每 5 秒同步');
       const people=new Map(this.contacts.filter(p=>p.kind==='friend'&&Object.hasOwn(p,'avatar_url')).map(p=>[p.target,p]));
       for(const message of this.messages){const person=people.get(message.sender);if(person){message.sender_avatar_url=person.avatar_url;message.sender_name=person.title;}}
-      if(this.active){const contact=this.contacts.find(t=>t.id===this.active.id);if(!contact){this.back();this.actions.toast('已移除好友或離開遠征隊，無法繼續查看對話。');}else this.active=contact;}
+      const allowed=new Set(this.contacts.map(contact=>contact.id));
+      for(const drafts of [this.drafts,this.retryMessages])for(const key of drafts.keys())if(!allowed.has(key))drafts.delete(key);
+      if(this.active){const contact=this.contacts.find(t=>t.id===this.active.id);if(!contact){this.back();this.actions.toast('目前已無此對話的成員資格，無法繼續查看。');}else this.active=contact;}
       this.view.threads(this.contacts,this.active);
     }catch(error){this.handle(error,generation);}
     finally{if(generation===this.generation)this.syncing=false;}
@@ -36,7 +38,8 @@ class ChatClient {
   }
   async open(kind,target){
     if(!this.identity())return this.actions.login();
-    this.root.dataset.view='list';this.view.open();await this.sync();
+    if(kind==='squad')this.view.filter='squad';
+    this.root.dataset.view='list';this.view.open();await this.sync({fresh:true});
     if(kind&&target)await this.choose(kind+':'+target);
   }
   back(){

@@ -16,6 +16,7 @@
 button.chat-message-avatar:hover{border-color:var(--green)}
 .chat-message-avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .chat-contact-icon{position:relative;overflow:hidden;font-size:14px;font-weight:650}
+.chat-contact-icon.squad{color:var(--orange);background:var(--orange-soft);border-color:var(--line);border-radius:9px}
 .chat-contact-icon img,.chat-heading-avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .chat-contact-heading{display:flex;align-items:center;gap:12px}
 .chat-contact-heading>div{min-width:0;flex:1}

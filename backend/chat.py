@@ -1,11 +1,11 @@
-"""Plain-text friend DMs and expedition chats, authorized on every request."""
+"""Plain-text friend, expedition and squad chats, authorized on every request."""
 import time
 from typing import Literal
 
 from fastapi import HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-ChatKind = Literal['friend', 'expedition']
+ChatKind = Literal['friend', 'expedition', 'squad']
 
 
 class ChatMessage(BaseModel):
@@ -34,25 +34,39 @@ class Chat:
         self.connect, self.accounts = connect, accounts
 
     def migrate(self):
-        with self.connect() as c:
-            c.executescript('''
-            CREATE TABLE IF NOT EXISTS chat_messages (
+        schemas = {
+            'chat_messages': '''CREATE TABLE {table} (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
-              kind TEXT NOT NULL CHECK(kind IN ('friend','expedition')),
+              kind TEXT NOT NULL CHECK(kind IN ('friend','expedition','squad')),
               thread TEXT NOT NULL, sender TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
               body TEXT NOT NULL CHECK(length(body) BETWEEN 1 AND 2000),
               client_id TEXT NOT NULL, created INTEGER NOT NULL,
-              UNIQUE(sender,client_id)
-            );
-            CREATE INDEX IF NOT EXISTS chat_thread_messages ON chat_messages(kind,thread,id);
-            CREATE INDEX IF NOT EXISTS chat_sender_time ON chat_messages(sender,created);
-            CREATE TABLE IF NOT EXISTS chat_reads (
+              UNIQUE(sender,client_id))''',
+            'chat_reads': '''CREATE TABLE {table} (
               user TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-              kind TEXT NOT NULL CHECK(kind IN ('friend','expedition')),
+              kind TEXT NOT NULL CHECK(kind IN ('friend','expedition','squad')),
               thread TEXT NOT NULL,last_id INTEGER NOT NULL DEFAULT 0,
-              PRIMARY KEY(user,kind,thread)
-            );
-            ''')
+              PRIMARY KEY(user,kind,thread))''',
+        }
+        with self.connect() as c:
+            c.execute('BEGIN IMMEDIATE')
+            for table, schema in schemas.items():
+                existing = c.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name=?",(table,)).fetchone()
+                if existing is None:
+                    c.execute(schema.format(table=table))
+                elif "'squad'" not in existing['sql']:
+                    sequence = c.execute('SELECT seq FROM sqlite_sequence WHERE name=?',(table,)).fetchone() if table=='chat_messages' else None
+                    upgraded = table+'_upgrade'
+                    c.execute(schema.format(table=upgraded))
+                    c.execute(f'INSERT INTO {upgraded} SELECT * FROM {table}')
+                    c.execute(f'DROP TABLE {table}')
+                    c.execute(f'ALTER TABLE {upgraded} RENAME TO {table}')
+                    if sequence is not None:
+                        changed = c.execute('UPDATE sqlite_sequence SET seq=MAX(seq,?) WHERE name=?',(sequence['seq'],table)).rowcount
+                        if not changed:
+                            c.execute('INSERT INTO sqlite_sequence(name,seq) VALUES(?,?)',(table,sequence['seq']))
+            c.execute('CREATE INDEX IF NOT EXISTS chat_thread_messages ON chat_messages(kind,thread,id)')
+            c.execute('CREATE INDEX IF NOT EXISTS chat_sender_time ON chat_messages(sender,created)')
 
     @staticmethod
     def thread(uid, kind, target):
@@ -64,6 +78,10 @@ class Chat:
                                 tuple(sorted((uid, target)))).fetchone()
             if not allowed:
                 raise HTTPException(403, '只有已互相接受邀請的好友可以私訊。')
+        elif kind == 'squad':
+            if not c.execute('''SELECT 1 FROM members m JOIN squads s ON s.id=m.squad AND s.expedition=m.expedition
+              WHERE m.user=? AND s.id=?''',(uid,target)).fetchone():
+                raise HTTPException(403,'只有這支小隊目前的成員可以查看或傳送訊息。')
         elif not c.execute('SELECT 1 FROM members WHERE user=? AND expedition=?', (uid, target)).fetchone():
             raise HTTPException(403, '只有這支遠征隊目前的成員可以查看或傳送訊息。')
         return self.thread(uid, kind, target)
@@ -96,6 +114,10 @@ class Chat:
                 contacts += [dict(r) for r in c.execute('''SELECT 'expedition' AS kind,e.id AS target,
                   e.name AS title,'遠征隊群聊' AS subtitle FROM members m JOIN expeditions e ON e.id=m.expedition
                   WHERE m.user=?''', (uid,))]
+                contacts += [dict(r) for r in c.execute('''SELECT 'squad' AS kind,s.id AS target,
+                  s.name AS title,e.name||' · 小隊群聊' AS subtitle FROM members m
+                  JOIN squads s ON s.id=m.squad AND s.expedition=m.expedition
+                  JOIN expeditions e ON e.id=m.expedition WHERE m.user=?''',(uid,))]
                 for contact in contacts:
                     kind, target = contact['kind'], contact['target']
                     digest=contact.pop('avatar_digest',None)

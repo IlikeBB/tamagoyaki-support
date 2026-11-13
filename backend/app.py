@@ -97,8 +97,11 @@ profiles = Profiles(connect, accounts, profile_media, reputation, ACTIVITY_VENUE
 
 
 def prune_empty_squads(c, eid=None):
-    c.execute('''DELETE FROM squads WHERE (? IS NULL OR expedition=?)
-      AND NOT EXISTS (SELECT 1 FROM members WHERE members.squad=squads.id)''',(eid,eid))
+    empty = '''SELECT id FROM squads WHERE (? IS NULL OR expedition=?)
+      AND NOT EXISTS (SELECT 1 FROM members WHERE members.squad=squads.id)'''
+    for table in ('chat_messages','chat_reads'):
+        c.execute(f"DELETE FROM {table} WHERE kind='squad' AND thread IN ({empty})",(eid,eid))
+    c.execute(f'DELETE FROM squads WHERE id IN ({empty})',(eid,eid))
 
 
 def init_db():
@@ -143,7 +146,6 @@ def init_db():
         CREATE INDEX IF NOT EXISTS pins_expedition ON pins(expedition);
         CREATE INDEX IF NOT EXISTS members_squad ON members(squad);
         """)
-        prune_empty_squads(c)
     accounts.migrate()
     friends.migrate()
     with connect() as c:
@@ -156,6 +158,8 @@ def init_db():
             c.execute("ALTER TABLE tasks ADD COLUMN location_mode TEXT NOT NULL DEFAULT 'publisher' CHECK(location_mode IN ('publisher','fixed'))")
     assistance.migrate()
     chat.migrate()
+    with connect() as c:
+        prune_empty_squads(c)
     reputation.migrate()
     profile_media.migrate()
     profiles.migrate()
@@ -408,7 +412,7 @@ def delete_expedition(eid: str,request: Request):
         c.execute('DELETE FROM tasks WHERE expedition=?',(eid,))
         c.execute('DELETE FROM pins WHERE expedition=?',(eid,))
         c.execute('DELETE FROM members WHERE expedition=?',(eid,))
-        c.execute('DELETE FROM squads WHERE expedition=?',(eid,))
+        prune_empty_squads(c,eid)
         c.execute("DELETE FROM chat_messages WHERE kind='expedition' AND thread=?",(eid,))
         c.execute("DELETE FROM chat_reads WHERE kind='expedition' AND thread=?",(eid,))
         c.execute('DELETE FROM expeditions WHERE id=?',(eid,))

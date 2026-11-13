@@ -36,7 +36,7 @@ class ChatView {
   }
   contact(contact){
     this.text('chat-title',contact?.title||'訊息');this.text('chat-contact-title',contact?.title||'');
-    this.text('chat-contact-subtitle',contact?.kind==='friend'?'好友私訊 · 僅你們雙方可讀':'遠征隊群聊 · 目前隊員可讀');
+    this.text('chat-contact-subtitle',contact?.kind==='friend'?'好友私訊 · 僅你們雙方可讀':contact?.kind==='squad'?`${contact.subtitle} · 目前小隊成員可讀`:'遠征隊群聊 · 目前隊員可讀');
     const portrait=this.root.querySelector('#chat-contact-avatar');portrait.hidden=contact?.kind!=='friend';
     if(contact?.kind==='friend'){
       portrait.setAttribute('aria-label','查看 '+contact.title+' 的好友選項');this.portrait(portrait,contact.title,contact.avatar_url);
@@ -50,17 +50,17 @@ class ChatView {
     const fragment=document.createDocumentFragment();
     for(const contact of visible){
       const button=document.createElement('button');button.type='button';button.className='chat-contact';button.dataset.chatKey=contact.id;button.setAttribute('aria-current',String(contact.id===active?.id));
-      const avatar=document.createElement('span');avatar.className='chat-contact-icon '+contact.kind;avatar.setAttribute('aria-hidden','true');this.portrait(avatar,contact.title,contact.avatar_url,contact.kind==='expedition');
+      const avatar=document.createElement('span');avatar.className='chat-contact-icon '+contact.kind;avatar.setAttribute('aria-hidden','true');this.portrait(avatar,contact.title,contact.avatar_url,contact.kind!=='friend');
       const copy=document.createElement('span');copy.className='chat-contact-copy';
       const name=document.createElement('strong');name.textContent=contact.title;
-      const note=document.createElement('small');note.textContent=contact.latest?`${contact.latest.sender_name}：${contact.latest.body}`:contact.kind==='friend'?'傳送第一則私訊':'和遠征夥伴聊聊集合與現場情報';
-      const meta=document.createElement('small');meta.className='chat-contact-meta';meta.textContent=contact.kind==='friend'?'好友私訊':'遠征隊群聊';copy.append(name,meta,note);button.append(avatar,copy);
+      const note=document.createElement('small');note.textContent=contact.latest?`${contact.latest.sender_name}：${contact.latest.body}`:contact.kind==='friend'?'傳送第一則私訊':contact.kind==='squad'?'和同行小隊聊聊集合與行程':'和遠征夥伴聊聊集合與現場情報';
+      const meta=document.createElement('small');meta.className='chat-contact-meta';meta.textContent=contact.kind==='friend'?'好友私訊':contact.kind==='squad'?contact.subtitle:'遠征隊群聊';copy.append(name,meta,note);button.append(avatar,copy);
       if(contact.unread){const badge=document.createElement('span');badge.className='chat-count';badge.textContent=contact.unread>99?'99+':contact.unread;badge.setAttribute('aria-label',`${contact.unread} 則未讀`);button.append(badge);}
       fragment.append(button);
     }
     const focused=this.list.contains(document.activeElement)?document.activeElement.dataset.chatKey:null;
     this.list.replaceChildren(fragment);if(focused)[...this.list.children].find(button=>button.dataset.chatKey===focused)?.focus({preventScroll:true});this.root.querySelector('#chat-list-empty').hidden=!!visible.length;
-    this.text('chat-list-empty',this.filter==='friend'?'還沒有好友。先到「好友」加入對方，就能私訊。':this.filter==='expedition'?'加入遠征隊後，就能和全隊聊天。':'還沒有對話。加入好友或遠征隊，就能在這裡聯絡夥伴。');
+    this.text('chat-list-empty',this.filter==='friend'?'還沒有好友。先到「好友」加入對方，就能私訊。':this.filter==='expedition'?'加入遠征隊後，就能和全隊聊天。':this.filter==='squad'?'建立或加入小隊後，聊天室會顯示在這裡。':'還沒有對話。加入好友、遠征隊或小隊，就能在這裡聯絡夥伴。');
   }
   select(contact,draft=''){
     this.active=contact;this.root.dataset.view=contact?'conversation':'list';
