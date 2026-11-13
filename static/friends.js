@@ -12,10 +12,16 @@ class FriendsClient {
     return this.data.friends.filter(p=>p.location_visible&&Number.isFinite(p.lat)&&Number.isFinite(p.lng)&&LocationState.valid(p.located))
       .map(p=>({...p,id:'friend:'+p.id,owner:p.id,owner_name:p.nickname,title:'好友 · 不受遠征隊限制',kind:'friend',location_source:'friend'}));
   }
-  async sync(){
+  async sync({fresh=false}={}){
     const user=this.actions.user();if(!user||document.hidden)return;
     if(this.ownerId!==user.id){this.reset();this.ownerId=user.id;}
-    if(this.syncing)return;this.syncing=true;const generation=this.generation;
+    const generation=this.generation;
+    if(this.syncing){
+      await this.syncing;
+      if(fresh&&generation===this.generation)return this.sync();
+      return;
+    }
+    this.syncing=(async()=>{
     try{
       const data=await this.actions.api('/friends');if(generation!==this.generation)return;
       this.data=data;this.syncedAt=Date.now();this.error='';this.actions.changed();
@@ -25,6 +31,8 @@ class FriendsClient {
       if(error.status===401){this.reset();this.actions.expired();}
       this.actions.changed();
     }finally{if(generation===this.generation)this.syncing=false;}
+    })();
+    return this.syncing;
   }
   publish(position,stamp){
     if(!this.sharing||!this.actions.user()||Date.now()-stamp>20000||stamp<=this.lastSampleAt||Date.now()-this.lastSent<4000)return;
@@ -44,7 +52,7 @@ class FriendsClient {
   async invite(form){
     await this.actions.submit(form,async()=>{
       await this.actions.api('/friends/requests','POST',{username:new FormData(form).get('username')});
-      form.reset();await this.sync();this.actions.toast('好友邀請已送出，等待對方接受。');
+      form.reset();await this.sync({fresh:true});this.actions.toast('好友邀請已送出，等待對方接受。');
     });
   }
   async act(action,id){
@@ -54,8 +62,9 @@ class FriendsClient {
     }else if(action==='friend-find')this.actions.find('friend:'+id);
     else if(action==='friend-chat')await this.actions.chat(id);
     else{
-      await this.actions.api('/friends/'+encodeURIComponent(id)+(action==='friend-accept'?'/accept':''),action==='friend-accept'?'POST':'DELETE');
-      await this.sync();this.actions.toast(action==='friend-accept'?'已成為好友，開啟位置分享就能互相找人。':'已移除，不再向對方提供位置。');
+      const operation=action==='friend-accept'?'accept':action==='friend-reject'?'reject':null;
+      await this.actions.api('/friends/'+encodeURIComponent(id)+(operation?'/'+operation:''),operation?'POST':'DELETE');
+      await this.sync({fresh:true});this.actions.toast(action==='friend-accept'?'已成為好友，開啟位置分享就能互相找人。':action==='friend-reject'?'已拒絕好友邀請。':'已移除，不再向對方提供位置。');
     }
   }
   mount(root,query=''){
@@ -74,7 +83,7 @@ class FriendsClient {
     const row=(p,buttons,note)=>`<article class="friend-row">${profileAvatar(p.nickname,p.id,p.avatar_url)}<div class="friend-info"><strong>${esc(p.nickname)}</strong><small>@${esc(p.username)}</small><small>${note}</small></div><div class="friend-actions">${buttons}</div></article>`;
     const button=(p,action,label)=>`<button data-action="${action}" data-id="${esc(p.id)}">${label}</button>`;
     const requests=root.querySelector('#friend-requests');
-    const html=(this.data.incoming.length?'<h2 class="friend-section-title">收到的邀請</h2>'+this.data.incoming.map(p=>row(p,button(p,'friend-accept','接受')+button(p,'friend-remove','拒絕'),'等待你接受')).join(''):'')+
+    const html=(this.data.incoming.length?'<h2 class="friend-section-title">收到的邀請</h2>'+this.data.incoming.map(p=>row(p,button(p,'friend-accept','接受')+button(p,'friend-reject','拒絕'),'等待你接受')).join(''):'')+
       (this.data.outgoing.length?'<h2 class="friend-section-title">送出的邀請</h2>'+this.data.outgoing.map(p=>row(p,button(p,'friend-remove','取消'),'等待對方接受')).join(''):'');
     if(requests.dataset.html!==html){requests.innerHTML=html;requests.dataset.html=html;}
     const visible=new Set(this.targets().map(t=>t.owner));

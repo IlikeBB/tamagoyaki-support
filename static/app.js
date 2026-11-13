@@ -42,7 +42,7 @@ let placeSearch=null;
 let assistance=null;
 let appDisplay=null;
 let chat=null;
-let profilePage=null,landmarkFeedback=null;
+let profilePage=null,landmarkFeedback=null,news=null,chatFriend=null;
 let locationCardDismissed=false;
 let centerOnLocationFix=true;
 let visibleTeammateKey='';
@@ -368,7 +368,7 @@ function selectTarget(type,id){
   if(!inRegion(p))toast('目標在一公里外，可關閉「1 km 範圍」查看地圖位置。');
 }
 function render(){
-  chat?.identity();profilePage?.identity();
+  chatFriend?.identity();chat?.identity();profilePage?.identity();syncNewsFriends();
   $('#room-name').textContent=state.room.name;$('#room-date').textContent=state.demo?'建立或加入遠征隊，和夥伴一起出發':`${activityDate(state.room.event_date)} · ${activityVenues().find(v=>v.id===state.room.venue)?.name||''}`;
   renderMapRangeControls();
   $('#demo-banner').classList.toggle('hidden',!state.demo);
@@ -840,12 +840,24 @@ async function openProfileRoom(id,pid){
   const me=await api('/me');state.rooms=me.expeditions;const room=state.rooms.find(r=>r.id===id);if(!room)throw new Error('你已不在這個遠征隊中。');
   if(state.room.id!==id||state.demo)await enterRoom(room,state.user);else await refresh();showMap();if(pid)selectTarget('pin',pid);
 }
+function syncNewsFriends(){
+  const owner=state.authenticated?state.user.id:null,available=owner&&friends?.ownerId===owner;
+  news?.setFriends(owner,available?friends.data.incoming:[],available?friends.error:'');
+}
 async function init(){
   icons();
+  news=new NewsBoard($('#news-dialog'),$('#news-launcher'),{
+    user:()=>state.authenticated?state.user:null,sync:()=>friends?.sync({fresh:true}),
+    respond:async(id,response)=>{await api('/friends/'+encodeURIComponent(id)+'/'+response,'POST');toast(response==='accept'?'已成為好友。':'已拒絕好友邀請。');}
+  });
+  chatFriend=new ChatFriendCard($('#chat-friend-dialog'),{
+    api,user:()=>state.authenticated?state.user:null,sync:()=>friends.sync({fresh:true}),
+    friends:()=>friends.ownerId===state.user.id&&friends.ready()?friends.data:null,news:()=>news.open('friends')
+  });
   profilePage=new ProfileClient($('#profile-dialog'),{api,toast,user:()=>state.authenticated?state.user:null,login:uid=>{authIntent={kind:'profile',uid};showAuth();},settings:showAccount,expired:()=>friends?.actions.expired(),updated:profile=>{state.user={...state.user,...profile};render();},room:id=>openProfileRoom(id),pin:(eid,pid)=>openProfileRoom(eid,pid),removeRoom:id=>showDeleteRoom(id)});
   landmarkFeedback=new LandmarkFeedback({api,toast,context:()=>({eid:state.room.id,pins:state.pins}),changed:()=>render()});
   appDisplay=new AppDisplay({dialog,close:closeDialog,toast});
-  chat=new ChatClient($('#chat-dialog'),{api,toast,user:()=>state.authenticated?state.user:null,login:()=>{authIntent={kind:'chat'};showAuth();},expired:()=>friends?.actions.expired()});
+  chat=new ChatClient($('#chat-dialog'),{api,toast,user:()=>state.authenticated?state.user:null,login:()=>{authIntent={kind:'chat'};showAuth();},expired:()=>friends?.actions.expired(),person:id=>chatFriend.open(id)});
   mapActions=new MapActions($('#map'),$('#map-actions'),{
     pointAt:(x,y)=>{
       if(!map)return null;
@@ -870,7 +882,7 @@ async function init(){
     changed:status=>{if(status==='off'){if(state.scope==='help'){state.scope='off';state.position=null;}}else{state.scope='help';if(status==='denied')state.position=null;}if(config){renderLocation();renderMap();}},
     position:p=>{state.scope='help';lastPositionAt=p.timestamp;state.position={lat:p.coords.latitude,lng:p.coords.longitude,accuracy:p.coords.accuracy};if(centerOnLocationFix){centerOnLocationFix=false;showPositionOnMap(state.position);}renderLocation();renderMap();}
   });
-  friends=new FriendsClient({api,escape:esc,submit,toast,user:()=>state.authenticated?state.user:null,location:showLocation,chat:id=>chat.open('friend',id),find:id=>selectTarget('friend',id),stopped:()=>{if(state.scope==='friends')state.scope='local';},changed:()=>{if(!config)return;$('#friend-count').textContent=friends.data.friends.length;if(state.tab==='friends')renderPanel();renderMap();},expired:()=>{state.authenticated=false;state.user={id:'me',nickname:'你'};resetLobby();render();toast('登入已失效，請重新登入。');}});
+  friends=new FriendsClient({api,escape:esc,submit,toast,user:()=>state.authenticated?state.user:null,location:showLocation,chat:id=>chat.open('friend',id),find:id=>selectTarget('friend',id),stopped:()=>{if(state.scope==='friends')state.scope='local';},changed:()=>{syncNewsFriends();if(!config)return;$('#friend-count').textContent=friends.data.friends.length;if(state.tab==='friends')renderPanel();renderMap();},expired:()=>{state.authenticated=false;state.user={id:'me',nickname:'你'};resetLobby();render();toast('登入已失效，請重新登入。');}});
   finder=new TeammateFinder($('#teammate-finder'),{join:()=>showJoin(),friends:()=>setTab('friends'),tasks:()=>setTab('tasks'),refresh:()=>{refresh();friends.sync();},location:()=>showLocation(),compass:()=>compass(),map:showFinderTaskOnMap,distance,bearing,meters,direction});
   renderFinder();setInterval(refreshTeammateGuidance,1000);
   try{

@@ -52,7 +52,7 @@ class Friends:
             with self.connect() as c:
                 own = c.execute('SELECT located FROM friend_locations WHERE user=?', (uid,)).fetchone()
                 result['sharing'] = bool(own and own['located'] >= stamp-self.ttl)
-                rows = c.execute('''SELECT u.id,u.username,u.nickname,f.status,f.requested_by,
+                rows = c.execute('''SELECT u.id,u.username,u.nickname,f.status,f.requested_by,f.created,
                   p.lat,p.lng,p.accuracy,p.located,a.digest AS avatar_digest FROM friendships f
                   JOIN users u ON u.id=CASE WHEN f.user_a=? THEN f.user_b ELSE f.user_a END
                   LEFT JOIN friend_locations p ON p.user=u.id
@@ -69,6 +69,7 @@ class Friends:
                             person[key] = row[key] if visible else None
                         result['friends'].append(person)
                     else:
+                        person['requested_at'] = row['created']
                         result['outgoing' if row['requested_by'] == uid else 'incoming'].append(person)
             return result
 
@@ -122,6 +123,17 @@ class Friends:
                   (*sorted((uid, other)), other)).rowcount
                 if not changed:
                     raise HTTPException(404, '這份好友邀請已失效。')
+            return {'ok': True}
+
+        @app.post('/api/friends/{other}/reject')
+        def reject(other: str, request: Request):
+            uid = self.accounts.current_user(request)['id']
+            with self.connect() as c:
+                changed = c.execute('''DELETE FROM friendships
+                  WHERE user_a=? AND user_b=? AND requested_by=? AND status='pending' ''',
+                  (*sorted((uid, other)), other)).rowcount
+                if not changed:
+                    raise HTTPException(404, '這份好友邀請已失效或已處理。')
             return {'ok': True}
 
         @app.delete('/api/friends/{other}')

@@ -70,8 +70,17 @@ class Chat:
 
     @staticmethod
     def message(c, mid):
-        return dict(c.execute('''SELECT m.id,m.sender,u.nickname AS sender_name,m.body,m.created
-          FROM chat_messages m JOIN users u ON u.id=m.sender WHERE m.id=?''', (mid,)).fetchone())
+        row=c.execute('''SELECT m.id,m.sender,u.nickname AS sender_name,m.body,m.created,a.digest AS avatar_digest
+          FROM chat_messages m JOIN users u ON u.id=m.sender
+          LEFT JOIN profile_media a ON a.user=u.id AND a.kind='avatar' WHERE m.id=?''', (mid,)).fetchone()
+        return Chat.present(row)
+
+    @staticmethod
+    def present(row):
+        message=dict(row)
+        digest=message.pop('avatar_digest')
+        message['sender_avatar_url']=f"/api/profiles/{message['sender']}/media/avatar?v={digest}" if digest else None
+        return message
 
     def install(self, app):
         @app.get('/api/chat')
@@ -115,8 +124,9 @@ class Chat:
                 if after is not None:
                     clause = ' AND m.id>?'; params.append(after)
                 order = 'ASC' if after is not None else 'DESC'
-                rows = [dict(r) for r in c.execute('''SELECT m.id,m.sender,u.nickname AS sender_name,m.body,m.created
-                  FROM chat_messages m JOIN users u ON u.id=m.sender WHERE m.kind=? AND m.thread=?'''+clause+
+                rows = [self.present(r) for r in c.execute('''SELECT m.id,m.sender,u.nickname AS sender_name,m.body,m.created,a.digest AS avatar_digest
+                  FROM chat_messages m JOIN users u ON u.id=m.sender
+                  LEFT JOIN profile_media a ON a.user=u.id AND a.kind='avatar' WHERE m.kind=? AND m.thread=?'''+clause+
                   ' ORDER BY m.id '+order+' LIMIT 51', params)]
             more = len(rows)>50
             rows = rows[:50]

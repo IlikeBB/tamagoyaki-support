@@ -10,6 +10,7 @@ class ChatView {
     root.querySelector('#chat-older').onclick=()=>actions.older();
     root.querySelector('#chat-new').onclick=()=>{this.scroll.scrollTop=this.scroll.scrollHeight;actions.read();};
     this.list.onclick=event=>{const button=event.target.closest('[data-chat-key]');if(button)actions.choose(button.dataset.chatKey);};
+    this.log.addEventListener('click',event=>{const button=event.target.closest('[data-chat-person]');if(button)actions.person(button.dataset.chatPerson);});
     root.querySelectorAll('[data-chat-filter]').forEach(button=>button.onclick=()=>{this.filter=button.dataset.chatFilter;this.threads(this.contacts||[],this.active);});
     this.form.onsubmit=event=>{event.preventDefault();actions.send();};
     this.input.oninput=()=>{actions.draft(this.input.value);this.composer(this.busy);};
@@ -62,7 +63,13 @@ class ChatView {
       const row=document.createElement('li');row.dataset.messageId=message.id;row.className='chat-message'+(message.sender===uid?' is-own':'');
       const meta=document.createElement('div');meta.className='chat-message-meta';const name=document.createElement('strong');name.textContent=message.sender===uid?'你':message.sender_name;
       const time=document.createElement('time');time.dateTime=new Date(message.created*1000).toISOString();time.textContent=new Intl.DateTimeFormat('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}).format(message.created*1000);meta.append(name,time);
-      const body=document.createElement('p');body.textContent=message.body;row.append(meta,body);
+      const body=document.createElement('p');body.textContent=message.body;
+      const copy=document.createElement('div');copy.className='chat-message-copy';copy.append(meta,body);
+      const portrait=document.createElement(message.sender===uid?'span':'button');portrait.className='chat-message-avatar';
+      if(message.sender!==uid){portrait.type='button';portrait.dataset.chatPerson=message.sender;portrait.setAttribute('aria-label','查看 '+message.sender_name+' 的好友邀請選項');}
+      portrait.textContent=[...(message.sender_name||'夥伴')][0];
+      if(message.sender_avatar_url){const image=document.createElement('img');image.src=message.sender_avatar_url;image.alt='';image.loading='lazy';image.addEventListener('error',()=>image.remove(),{once:true});portrait.append(image);}
+      row.append(portrait,copy);
       const next=[...this.log.children].find(node=>Number(node.dataset.messageId)>message.id);this.log.insertBefore(row,next||null);
     }
     this.root.querySelector('#chat-empty').hidden=!!messages.length;this.text('chat-empty','還沒有訊息，傳句話打個招呼吧。');this.root.querySelector('#chat-older').hidden=!hasOlder;

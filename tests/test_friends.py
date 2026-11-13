@@ -91,6 +91,24 @@ class FriendsTest(unittest.TestCase):
         self.assertEqual(self.invite().status_code, 200)
         self.assertEqual(self.b.get('/api/friends').json()['friends'], [])
 
+    def test_only_recipient_can_reject_pending_invitation(self):
+        self.assertEqual(self.invite().status_code,200)
+        pending=self.b.get('/api/friends').json()['incoming'][0]
+        self.assertIsInstance(pending['requested_at'],int)
+        self.assertNotIn('lat',pending)
+        path='/api/friends/'+self.users[0]['id']+'/reject'
+        self.assertEqual(TestClient(self.module.app,headers={'X-Tamago-Client':'web'}).post(path).status_code,401)
+        self.assertEqual(self.c.post(path).status_code,404)
+        self.assertEqual(self.a.post('/api/friends/'+self.users[1]['id']+'/reject').status_code,404)
+        self.assertEqual(len(self.b.get('/api/friends').json()['incoming']),1)
+        self.assertEqual(self.b.post(path).status_code,200)
+        self.assertEqual(self.b.get('/api/friends').json()['incoming'],[])
+        self.assertEqual(self.a.get('/api/friends').json()['outgoing'],[])
+        self.assertEqual(self.invite().status_code,200)
+        self.assertEqual(self.b.post('/api/friends/'+self.users[0]['id']+'/accept').status_code,200)
+        self.assertEqual(self.b.post(path).status_code,404)
+        self.assertEqual(len(self.b.get('/api/friends').json()['friends']),1)
+
     def test_invite_validation_permissions_and_atomic_duplicates(self):
         self.assertEqual(TestClient(self.module.app).get('/api/friends').status_code, 401)
         self.assertEqual(self.a.post('/api/friends/requests', json={'username': self.names[0]}).status_code, 409)

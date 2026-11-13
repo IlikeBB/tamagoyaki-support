@@ -26,6 +26,7 @@ try{
  await expect(page.locator('#news-launcher')).toBeVisible();await expect(page.locator('.news-unread')).toBeVisible();
  await page.locator('#news-launcher').click();await expect(page.locator('#news-dialog')).toBeVisible();
  await expect(page.locator('#news-list')).toContainText('「所有人」位置篩選暫停使用');await expect(page.locator('.news-unread')).toBeHidden();
+ const publishedCount=await page.locator('.news-item').count();expect(publishedCount).toBeGreaterThan(0);
  await page.locator('[data-news-filter=event]').click();await expect(page.locator('#news-list')).toContainText('目前沒有活動公告');
  await page.keyboard.press('Escape');await expect(page.locator('#news-dialog')).toBeHidden();await expect(page.locator('#news-launcher')).toBeFocused();
  await page.reload();await expect.poll(()=>page.evaluate(()=>!!map),{timeout:30000}).toBe(true);await expect(page.locator('.news-unread')).toBeHidden();
@@ -37,7 +38,7 @@ try{
   expect(launcher.x).toBeGreaterThanOrEqual(0);expect(launcher.x+launcher.width).toBeLessThanOrEqual(width);
   expect(launcher.y).toBeGreaterThanOrEqual(header.y);expect(launcher.y+launcher.height).toBeLessThanOrEqual(header.y+header.height);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-  await page.locator('#news-launcher').click();await expect(page.locator('#news-status')).toContainText('共 2 則公告');
+  await page.locator('#news-launcher').click();await expect(page.locator('#news-status')).toContainText(`共 ${publishedCount} 則公告`);
   const dialog=await page.locator('#news-dialog').boundingBox();expect(dialog.x).toBeGreaterThanOrEqual(0);expect(dialog.x+dialog.width).toBeLessThanOrEqual(width);expect(dialog.y+dialog.height).toBeLessThanOrEqual(845);
   if(width===390||width===1440)await page.screenshot({path:`artifacts/news-${origin.startsWith('https:')?'public':'local'}-${width}.png`});
   await page.locator('#news-close').click();
@@ -63,7 +64,7 @@ try{
  newsMode='error';await page.locator('#news-launcher').click();await expect(page.locator('#news-status')).toContainText('公告暫時無法載入');await expect(page.locator('#news-retry')).toBeVisible();
  newsMode='fixture';fixtures=[];await page.locator('#news-retry').click();await expect(page.locator('#news-list')).toContainText('目前沒有公告');await expect(page.locator('#news-retry')).toBeHidden();
  await page.locator('#news-close').click();newsMode='malformed';await page.locator('#news-launcher').click();await expect(page.locator('#news-status')).toContainText('公告暫時無法載入');
- newsMode='real';await page.locator('#news-retry').click();await expect(page.locator('.news-item')).toHaveCount(2);
+ newsMode='real';await page.locator('#news-retry').click();await expect(page.locator('.news-item')).toHaveCount(publishedCount);
  await page.keyboard.press('Escape');await expect(page.locator('#news-launcher')).toBeFocused();
  checks.push('empty feed, network errors, malformed feed and successful retry remain usable; closing restores focus');
  expect(errors).toEqual([]);expect(writes).toEqual([]);console.log(JSON.stringify({ok:true,origin,checks,errors,writes}));

@@ -9,7 +9,7 @@
 .news-toolbar h2{font-size:24px;line-height:1.3;margin:4px 0 0}
 #news-close{width:40px;height:40px;flex-shrink:0;border-radius:8px;background:var(--paper);font-size:24px;line-height:1}
 .news-intro{font-size:12px;color:var(--muted);margin:0;padding:0 24px 16px}
-.news-filters{display:flex;gap:8px;padding:0 24px 16px;border-bottom:1px solid var(--line)}
+.news-filters{display:flex;gap:8px;flex-wrap:wrap;padding:0 24px 16px;border-bottom:1px solid var(--line)}
 .news-filters button{min-height:40px;padding:8px 12px;border:1px solid var(--line);border-radius:6px;font-size:12px;color:var(--muted)}
 .news-filters button[aria-pressed=true]{background:var(--green-soft);color:var(--green);border-color:var(--green);font-weight:650}
 .news-status-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 24px 0}
@@ -27,6 +27,18 @@
 .news-item .news-event-date{font-weight:650;color:var(--orange)}
 .news-link{display:inline-flex;align-items:center;min-height:40px;margin-top:8px;font-size:13px;color:var(--green);text-underline-offset:4px}
 .news-empty{font-size:13px;line-height:1.8;color:var(--muted);padding:32px 0}
+#news-invitations{padding:20px 0;border-bottom:1px solid var(--line)}
+#news-invitation-title{font-size:15px;margin:0 0 12px}
+#news-invitation-status{font-size:12px;line-height:1.8;color:var(--orange);margin:0}
+.news-invite{padding:16px;margin-top:12px;border:1px solid var(--line);border-radius:8px;background:var(--paper);overflow-wrap:anywhere}
+.news-invite-person{display:flex;align-items:center;gap:12px}
+.news-invite-avatar{position:relative;display:grid;place-items:center;flex:0 0 40px;width:40px;height:40px;border-radius:50%;background:var(--green-soft);color:var(--green);font-weight:650;overflow:hidden}
+.news-invite-avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.news-invite-person strong{font-size:14px}
+.news-invite-person small{display:block;font-size:11px;color:var(--muted)}
+.news-invite p{font-size:12px;color:var(--muted);margin:12px 0}
+.news-invite-actions{display:flex;gap:8px;flex-wrap:wrap}
+.news-invite-actions .button{min-height:40px;font-size:12px;padding:8px 12px}
 @media(max-width:700px){
   .app-header .brand{flex:1;min-width:35px;overflow:hidden;gap:6px}
   .app-header .brand>span{min-width:0}

@@ -2,7 +2,7 @@
 class ChatClient {
   constructor(root,actions){
     this.actions=actions;this.root=root;this.owner=null;this.generation=0;this.selection=0;this.contacts=[];this.messages=[];this.drafts=new Map();this.retryMessages=new Map();
-    this.view=new ChatView(root,{choose:key=>this.choose(key),send:()=>this.send(),draft:text=>{if(this.active)this.drafts.set(this.active.id,text);},read:()=>this.markRead(),older:()=>this.loadOlder(),retry:()=>this.tick(),back:()=>this.back(),closed:()=>this.back()});
+    this.view=new ChatView(root,{choose:key=>this.choose(key),person:id=>{if(id!==this.owner&&this.messages.some(m=>m.sender===id))this.actions.person(id);},send:()=>this.send(),draft:text=>{if(this.active)this.drafts.set(this.active.id,text);},read:()=>this.markRead(),older:()=>this.loadOlder(),retry:()=>this.tick(),back:()=>this.back(),closed:()=>this.back()});
     for(const name of ['online','offline'])window.addEventListener(name,()=>{this.view.composer(this.sending);if(navigator.onLine)this.tick();else this.view.status('離線 · 連線後重新同步');});
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)this.tick();});
   }
