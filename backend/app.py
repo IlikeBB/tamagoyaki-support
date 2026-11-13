@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 from fastapi.exception_handlers import request_validation_exception_handler
-from pydantic import BaseModel, Field, ConfigDict, field_validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator, SecretStr
 from typing import Literal
 from .accounts import Accounts, client_address
 from .friends import Friends
@@ -31,6 +31,9 @@ from .task_feedback import TaskFeedback
 from .squad_invites import SquadInvites
 from .expedition_members import ExpeditionMembers
 from .site_admin import SiteAdmin
+from .expedition_settings import ExpeditionSettings, JoinPassword, room_is_listed
+from .pin_approvals import PinApprovals
+from .blocked_users import BlockedUsers
 
 ROOT = Path(__file__).resolve().parents[1]
 DB = Path(os.environ.get("TAMAGO_DB", str(ROOT / "data" / "tamagoyaki.sqlite3")))
@@ -113,6 +116,8 @@ def prune_empty_squads(c, eid=None):
 
 
 expedition_members = ExpeditionMembers(connect, accounts, profile_media, task_feedback, assistance, prune_empty_squads)
+expedition_settings = ExpeditionSettings(connect, accounts, expedition_members, profiles, lambda: code())
+pin_approvals = PinApprovals(connect, accounts, expedition_settings, reputation)
 
 
 def init_db():
@@ -177,6 +182,8 @@ def init_db():
     task_feedback.migrate()
     profile_media.migrate()
     profiles.migrate()
+    expedition_settings.migrate()
+    pin_approvals.migrate()
     with connect() as c:
         c.execute("UPDATE members SET scope='off',lat=NULL,lng=NULL,accuracy=NULL,located=NULL WHERE scope='expedition'")
 
@@ -209,6 +216,9 @@ async def lifespan(app):
 
 app = FastAPI(title="玉子燒支援隊", lifespan=lifespan, docs_url=None, redoc_url=None)
 app.include_router(expedition_members.router)
+app.include_router(expedition_settings.router)
+app.include_router(pin_approvals.router)
+app.include_router(BlockedUsers(connect, accounts, profile_media).router)
 app.include_router(SiteAdmin(connect, accounts).router)
 accounts.install(app)
 friends.install(app)
@@ -306,6 +316,7 @@ class Join(Input):
 
 
 class ExpeditionJoin(Join):
+    password: SecretStr | None = Field(default=None,max_length=128)
     squad_code: str | None = Field(default=None,min_length=8,max_length=8,pattern=r'^[A-Za-z0-9]+$')
 
 
@@ -388,6 +399,7 @@ def me(request: Request):
         return {"user": None, "expeditions": []}
     with connect() as c:
         rooms = [dict(r) for r in c.execute("SELECT e.*,CASE WHEN e.owner=m.user THEN 'leader' WHEN m.deputy=1 THEN 'deputy' ELSE 'member' END AS my_role FROM expeditions e JOIN members m ON m.expedition=e.id WHERE m.user=? ORDER BY e.created DESC", (u["id"],))]
+        expedition_settings.annotate(c,rooms)
         help_rooms=assistance.rooms(c,u['id'])
         account = {**accounts.public(u), **profiles.public(c,u['id'])}
     return {"user": account, "expeditions": rooms, "help_rooms":help_rooms}
@@ -458,24 +470,26 @@ def delete_expedition(eid: str,request: Request):
 def venue_expeditions(vid: str):
     if vid not in {v['id'] for v in ACTIVITY_VENUES}:
         raise HTTPException(404,'找不到這個場館。')
-    today = str(datetime.now(timezone(timedelta(hours=9))).date())
     with connect() as c:
         rows = c.execute('''SELECT e.id,e.name,e.venue,e.event_date,
           (SELECT COUNT(*) FROM members m WHERE m.expedition=e.id) AS member_count
-          FROM expeditions e WHERE e.venue=? AND e.discoverable=1 AND (e.event_date='' OR e.event_date>=?)
-          ORDER BY (e.event_date=''),e.event_date,e.created DESC,e.id''',(vid,today))
-        rooms = [dict(row) for row in rows]
+          FROM expeditions e WHERE e.venue=? AND e.discoverable=1
+          ORDER BY (e.event_date=''),e.event_date,e.created DESC,e.id''',(vid,))
+        rooms = [dict(row) for row in rows if room_is_listed(c,row)]
+        expedition_settings.annotate(c,rooms)
     return {'expeditions':rooms}
 
 
 @app.post('/api/expeditions/{eid}/join')
-def join_public_expedition(eid: str, request: Request):
+def join_public_expedition(eid: str, request: Request, body: JoinPassword | None = None):
     u = user(request)
+    accounts.limit('room-admission',u['id'],60,300)
     with connect() as c:
         c.execute('BEGIN IMMEDIATE')
         room = c.execute('SELECT * FROM expeditions WHERE id=? AND discoverable=1',(eid,)).fetchone()
         if room is None:
             raise HTTPException(404,'找不到可公開加入的遠征隊，私人隊伍需使用邀請碼。')
+        expedition_settings.admit(c,room,u['id'],body.password if body else None,public=True)
         c.execute('INSERT OR IGNORE INTO members(user,expedition,seen) VALUES(?,?,?)',(u['id'],eid,now()))
         profiles.joined(c,u['id'],eid)
     return dict(room)
@@ -484,11 +498,13 @@ def join_public_expedition(eid: str, request: Request):
 @app.post("/api/join")
 def join(body: ExpeditionJoin, request: Request):
     u = user(request)
+    accounts.limit('room-admission',u['id'],60,300)
     with connect() as c:
         c.execute('BEGIN IMMEDIATE')
         room = c.execute("SELECT * FROM expeditions WHERE code=?", (body.code.upper(),)).fetchone()
         if room is None:
             raise HTTPException(404, "找不到這個邀請碼，請向隊長確認。")
+        expedition_settings.admit(c,room,u['id'],body.password)
         squad=None
         if body.squad_code:
             squad=c.execute('SELECT * FROM squads WHERE expedition=? AND code=?',(room['id'],body.squad_code.upper())).fetchone()
@@ -505,12 +521,11 @@ def join(body: ExpeditionJoin, request: Request):
 @app.get('/api/expeditions/{eid}/preview')
 def preview_expedition(eid: str,request: Request,offset: int=Query(default=0,ge=0,le=1000000)):
     uid=user(request)['id']
-    today=str(datetime.now(timezone(timedelta(hours=9))).date())
     with connect() as c:
         c.execute('BEGIN')
-        room=c.execute('SELECT id,name,owner,discoverable,event_date FROM expeditions WHERE id=?',(eid,)).fetchone()
+        room=c.execute('SELECT id,name,owner,venue,discoverable,event_date FROM expeditions WHERE id=?',(eid,)).fetchone()
         joined=c.execute('SELECT 1 FROM members WHERE expedition=? AND user=?',(eid,uid)).fetchone()
-        if not room or not (joined or room['owner']==uid or room['discoverable'] and (not room['event_date'] or room['event_date']>=today)):
+        if not room or not (joined or room['owner']==uid or room_is_listed(c,room)):
             raise HTTPException(404,'找不到可查看成員的遠征隊。')
         total=c.execute('SELECT COUNT(*) FROM members WHERE expedition=?',(eid,)).fetchone()[0]
         rows=c.execute('''SELECT m.user,u.nickname FROM members m JOIN users u ON u.id=m.user
@@ -530,8 +545,10 @@ def snapshot(eid: str, request: Request):
         # Use the membership protected by this transaction, including squad changes.
         mine=dict(c.execute('SELECT * FROM members WHERE user=? AND expedition=?',(u['id'],eid)).fetchone())
         room = dict(c.execute("SELECT * FROM expeditions WHERE id=?", (eid,)).fetchone())
+        expedition_settings.annotate(c,[room])
         members = []
-        help_positions=assistance.positions(c,eid)
+        blocked=accounts.blocked_ids(c,u['id'])
+        help_positions={uid:point for uid,point in assistance.positions(c,eid).items() if uid not in blocked}
         help_rooms=assistance.rooms(c,u['id'])
         private_positions = {}
         for row in c.execute("SELECT m.*,u.nickname FROM members m JOIN users u ON u.id=m.user WHERE m.expedition=? ORDER BY m.seen DESC", (eid,)):
@@ -541,7 +558,7 @@ def snapshot(eid: str, request: Request):
             p["online"] = p["seen"] >= stamp-40
             # Membership alone never opts a user into location sharing.
             audience = p['scope']=='squad' and mine['squad'] is not None and p['squad']==mine['squad']
-            visible = (p['user'] != u['id'] and audience
+            visible = (p['user'] != u['id'] and p['user'] not in blocked and audience
                        and p['located'] is not None and p['located'] >= stamp-LOCATION_TTL_SECONDS)
             p['location_visible'] = visible
             help_point=help_positions.get(p['user'])
@@ -568,6 +585,7 @@ def snapshot(eid: str, request: Request):
             task['owner_avatar_url'] = profile_media.urls(c,task['owner'])['avatar_url']
             help_point=help_positions.get(task['owner']) if task['help_active'] and task['status'] in ('open','accepted') else None
             visible = bool(help_point) if task['help_active'] else task['owner'] == u['id'] or (task['status'] == 'accepted' and task['assignee'] == u['id'])
+            visible=visible and task['owner'] not in blocked
             task['location_visible'] = visible
             task['location_source'] = None
             task['accuracy'] = None
@@ -722,6 +740,7 @@ def create_task(eid: str, body: TaskInput, request: Request):
         c.execute('BEGIN IMMEDIATE')
         if not c.execute('SELECT 1 FROM members WHERE user=? AND expedition=?',(u['id'],eid)).fetchone():
             raise HTTPException(403,'請先加入這支遠征隊。')
+        accounts.require_publish(c,u['id'],eid)
         if c.execute("SELECT COUNT(*) FROM tasks WHERE owner=? AND status IN ('open','accepted') AND (expires>? OR help_active=1)",(u["id"],now())).fetchone()[0] >= 30:
             raise HTTPException(409,"進行中的任務已達 30 個。")
         c.execute("INSERT INTO tasks(id,expedition,owner,title,description,kind,lat,lng,status,assignee,created,expires,location_mode,help_active) VALUES(:id,:expedition,:owner,:title,:description,:kind,:lat,:lng,:status,:assignee,:created,:expires,:location_mode,:help_active)",task)
@@ -775,8 +794,13 @@ def create_pin(eid: str, body: PinInput, request: Request):
     u,_ = member(request,eid)
     pin = {"id":secrets.token_hex(10),"expedition":eid,"owner":u["id"],"title":body.title,"description":body.description,"kind":body.kind,"lat":body.lat,"lng":body.lng,"created":now(),"expires":now()+body.hours*3600 if body.hours else None}
     with connect() as c:
+        c.execute('BEGIN IMMEDIATE')
+        accounts.require_publish(c,u['id'],eid)
         if c.execute("SELECT COUNT(*) FROM pins WHERE expedition=? AND (expires IS NULL OR expires>?)",(eid,now())).fetchone()[0] >= 500:
             raise HTTPException(409,"此遠征隊的地標已達上限。")
+        if c.execute('SELECT COUNT(*) FROM pin_submissions WHERE expedition=? AND (expires IS NULL OR expires>?)',(eid,now())).fetchone()[0]>=500:
+            raise HTTPException(409,'等待審核的圖釘已達上限。')
+        if pin_approvals.submit(c,pin):return {**pin,'pending':True}
         c.execute("INSERT INTO pins VALUES(:id,:expedition,:owner,:title,:description,:kind,:lat,:lng,:created,:expires)",pin)
         reputation.record(c,pin)
     return pin

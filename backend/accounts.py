@@ -79,6 +79,12 @@ class Accounts:
               singleton INTEGER PRIMARY KEY CHECK(singleton=1),
               user TEXT UNIQUE NOT NULL REFERENCES users(id)
             );
+            CREATE TABLE IF NOT EXISTS user_blocks (
+              owner TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              blocked TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,created INTEGER NOT NULL,
+              PRIMARY KEY(owner,blocked),CHECK(owner<>blocked)
+            );
+            CREATE INDEX IF NOT EXISTS user_blocks_target ON user_blocks(blocked,owner);
             """)
             c.execute("INSERT OR IGNORE INTO site_admin_owner(singleton,user) SELECT 1,id FROM users WHERE username='momo' COLLATE NOCASE")
 
@@ -91,6 +97,24 @@ class Accounts:
     def require_active(c, uid):
         if not c.execute('SELECT 1 FROM users WHERE id=? AND suspended=0', (uid,)).fetchone():
             raise HTTPException(401, '此帳號已停用，請聯絡管理員。')
+
+    @staticmethod
+    def blocked_ids(c, uid):
+        return {row[0] for row in c.execute('SELECT blocked FROM user_blocks WHERE owner=? UNION SELECT owner FROM user_blocks WHERE blocked=?', (uid, uid))}
+
+    @staticmethod
+    def require_unblocked(c, uid, other):
+        if c.execute('SELECT 1 FROM user_blocks WHERE (owner=? AND blocked=?) OR (owner=? AND blocked=?)', (uid, other, other, uid)).fetchone():
+            raise HTTPException(403, '目前無法與這位使用者互動。')
+
+    @staticmethod
+    def require_publish(c, uid, eid):
+        Accounts.require_active(c, uid)
+        membership = c.execute('SELECT muted FROM members WHERE user=? AND expedition=?', (uid, eid)).fetchone()
+        if not membership:
+            raise HTTPException(403, '請先加入這支遠征隊。')
+        if membership['muted']:
+            raise HTTPException(403, '你在這支遠征隊已被禁言，暫時無法發布內容。')
 
     def current_user(self, request):
         token = request.cookies.get("tamago_session", "")

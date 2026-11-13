@@ -44,6 +44,7 @@ class ChatView {
   }
   threads(contacts,active){
     this.contacts=contacts;this.active=active;this.contact(active);
+    this.composer(this.busy);
     this.root.querySelectorAll('[data-chat-filter]').forEach(button=>{const on=button.dataset.chatFilter===this.filter;button.setAttribute('aria-pressed',String(on));});
     const visible=contacts.filter(t=>this.filter==='all'||t.kind===this.filter),key=JSON.stringify([visible,active?.id,this.filter]);
     if(this.list.dataset.key===key)return;this.list.dataset.key=key;
@@ -100,7 +101,7 @@ class ChatView {
     else if(messages.some(m=>!existing.has(m.id)))this.root.querySelector('#chat-new').hidden=false;
   }
   composer(busy=false){
-    this.busy=busy;this.send.disabled=busy||!this.input.value.trim()||!navigator.onLine;this.send.textContent=busy?'傳送中…':'傳送';
+    const muted=this.active?.can_send===false;this.busy=busy;this.input.disabled=muted;this.input.placeholder=muted?'你已被禁言，仍可閱讀訊息。':'想在哪裡會合？';this.send.disabled=muted||busy||!this.input.value.trim()||!navigator.onLine;this.send.textContent=muted?'已禁言':busy?'傳送中…':'傳送';
     this.text('chat-length',`${this.input.value.length} / 2000`);this.input.style.height='0px';this.input.style.height=Math.min(112,Math.max(48,this.input.scrollHeight))+'px';
   }
   fit(){

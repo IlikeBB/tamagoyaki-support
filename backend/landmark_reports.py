@@ -56,6 +56,7 @@ class LandmarkReports:
             uid=self.accounts.current_user(request)['id']
             with self.connect() as c:
                 c.execute('BEGIN IMMEDIATE');admin=self.authorize(c,uid,eid,pid)
+                self.accounts.require_publish(c,uid,eid)
                 old=c.execute('SELECT * FROM landmark_reports WHERE owner=? AND client_id=?',(uid,body.client_id)).fetchone()
                 if old:
                     if old['pin']!=pid or old['body']!=body.body:raise HTTPException(409,'這筆回報已使用，請重新輸入內容。')

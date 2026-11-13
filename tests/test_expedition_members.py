@@ -80,7 +80,7 @@ class ExpeditionMembersTest(test_app.RendezvousTest):
         self.assertEqual(roster['my_role'],'deputy')
         self.assertEqual(roster['total'],3)
         for person in roster['items']:
-            self.assertEqual(set(person),{'id','nickname','avatar_url','role','can_set_role','can_kick'})
+            self.assertEqual(set(person),{'id','nickname','avatar_url','role','muted','can_set_role','can_kick'})
             self.assertFalse(person['can_set_role'])
             self.assertEqual(person['can_kick'],person['id']==cid)
         self.assertEqual(roster['items'][0]['id'],aid)

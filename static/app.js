@@ -45,7 +45,7 @@ let placeSearch=null;
 let assistance=null;
 let appDisplay=null;
 let chat=null,squadInvites=null;
-let landmarkReports=null,pinFilters=null,expeditionPage=null,expeditionPreview=null,expeditionManagement=null,siteAccountAdmin=null;
+let landmarkReports=null,pinFilters=null,expeditionPage=null,expeditionPreview=null,expeditionManagement=null,siteAccountAdmin=null,roomSettings=null,memberActions=null,pinReview=null,blockedPeople=null,roomAdmission=null;
 let profilePage=null,landmarkFeedback=null,taskFeedback=null,news=null,chatFriend=null,groundMessages=null;
 let locationCardDismissed=false;
 let centerOnLocationFix=true;
@@ -323,10 +323,10 @@ function selectTarget(type,id){
   showPositionOnMap(p);renderMap();
 }
 function render(){
-  chatFriend?.identity();chat?.identity();profilePage?.identity();expeditionPreview?.sync();expeditionManagement?.sync();siteAccountAdmin?.sync();syncNewsFriends();
+  chatFriend?.identity();chat?.identity();profilePage?.identity();expeditionPreview?.sync();expeditionManagement?.sync();siteAccountAdmin?.sync();roomSettings?.sync();memberActions?.sync();pinReview?.sync();blockedPeople?.sync();roomAdmission?.sync();syncNewsFriends();
   const withoutRoomContext=['tasks','friends'].includes(state.tab);
   $('.sidebar-room-context').hidden=withoutRoomContext;$('.sidebar').classList.toggle('without-room-context',withoutRoomContext);
-  $('#room-name').textContent=state.room.name;$('#room-date').textContent=state.demo?'建立或加入遠征隊，和夥伴一起出發':`${activityDate(state.room.event_date)} · ${activityVenues().find(v=>v.id===state.room.venue)?.name||''}`;
+  $('#room-name').textContent=state.room.name;$('#room-date').textContent=state.demo?'建立或加入遠征隊，和夥伴一起出發':`${activitySchedule(state.room)} · ${activityVenues().find(v=>v.id===state.room.venue)?.name||''}`;
   renderVenueControl();
   $('#demo-banner').classList.toggle('hidden',!state.demo);
   $('.map-stage').classList.toggle('lobby',state.demo);
@@ -363,9 +363,9 @@ function renderPanel(){
       return `<article class="quest"><div class="quest-top"><span class="tag ${esc(t.kind)}">${esc(types[t.kind])}</span><span>${age(t.created)}</span></div><h2>${esc(t.title)}</h2><p>${esc(t.description||'接取任務後，取得發布者位置並前往會合。')}</p><p class="field-note">${privateNote}</p><div class="quest-bottom"><span class="person">${state.demo?avatar(t.owner_name||state.user.nickname,i):profileAvatar(t.owner_name||state.user.nickname,t.owner,t.owner_avatar_url,i)}${esc(t.owner_name||state.user.nickname)}</span><button class="accept" data-action="${!t.help_active&&!own&&!accepted&&t.status==='open'?'accept':'task-target'}" data-id="${esc(t.id)}" ${done||(!t.help_active&&!own&&!accepted&&t.status==='accepted')?'disabled':''}>${caption} ${icon(accepted?'location':'arrow')}</button></div>${t.help_active?(own?`<div class="quest-actions"><button data-action="cancel" data-id="${esc(t.id)}">刪除求助</button></div>`:''):own||accepted?`<div class="quest-actions">${!done?`<button data-action="complete" data-id="${esc(t.id)}">標記完成</button><button data-action="${own?'cancel':'release'}" data-id="${esc(t.id)}">${own?'撤回任務':'放棄接取'}</button>`:''}</div>`:''}${t.status==='accepted'?`<p class="field-note">接取者：${esc(t.assignee_name||'隊友')}</p>`:''}${!state.demo?taskFeedback?.controls(t)||'':''}</article>`;
     }).join('')||empty(q?'沒有符合的任務':state.demo?'目前沒有任務':'今天的第一個願望，由你發布。',q?'換個關鍵字試試看。':state.demo?'在場館選擇加入遠征隊，再發布任務。':'按右上角 ＋，發布交換、懸賞或配布物。');
   }else if(state.tab==='members'){
-    root.innerHTML=`${!state.demo?SquadPanel.render(state):''}<div class="subheading">${state.members.length} 位遠征夥伴</div>`+state.members.filter(match).map((m,i)=>{const target=expeditionPeople().find(t=>t.owner===m.user)||finderTasks().find(t=>t.owner===m.user);return `<div class="member-row">${state.demo?avatar(m.nickname,i):profileAvatar(m.nickname,m.user,m.avatar_url,i)}<div class="member-info"><strong>${esc(m.nickname)}${m.user===state.user.id?'（你）':''}</strong><small>${m.online?'在線':'離線'} · ${memberSharesLocation(m)?'已分享給好友／小隊':'未分享即時位置'}</small></div>${target?`<button data-action="task-target" data-id="${esc(target.id)}">尋找</button>`:''}</div>`;}).join('');
+    root.innerHTML=`${!state.demo?SquadPanel.render(state):''}<div class="subheading">${state.members.length} 位遠征夥伴</div>`+state.members.filter(match).map((m,i)=>{const target=expeditionPeople().find(t=>t.owner===m.user)||finderTasks().find(t=>t.owner===m.user);return `<div class="member-row">${state.demo?avatar(m.nickname,i):profileAvatar(m.nickname,m.user,m.avatar_url,i)}<div class="member-info"><strong>${esc(m.nickname)}${m.user===state.user.id?'（你）':''}</strong><small>${state.room.owner===m.user?'團長 · ':m.deputy?'副團長 · ':''}${m.muted?'已禁言 · ':''}${m.online?'在線':'離線'} · ${memberSharesLocation(m)?'已分享給好友／小隊':'未分享即時位置'}</small></div>${target?`<button data-action="task-target" data-id="${esc(target.id)}">尋找</button>`:''}${!state.demo&&m.user!==state.user.id?`<button type="button" class="member-options-button" data-action="member-options" data-id="${esc(m.user)}" aria-label="${esc(m.nickname)}的成員選項">⋯</button>`:''}</div>`;}).join('');
   }else{
-    root.innerHTML=`<div class="intel-create-actions" role="group" aria-label="建立情報點"><button type="button" class="button secondary" data-action="publish-intel" data-lifetime="temporary">${icon('plus')} 臨時情報點</button><button type="button" class="button outline" data-action="publish-intel" data-lifetime="permanent">${icon('pin')} 定期情報點</button></div><p class="field-note">此處可瀏覽隊內地標；地圖依左側追蹤／留言／按讚條件顯示。</p>`+state.pins.filter(match).map(p=>`<article class="pin-row"><div class="pin-row-head"><span class="pin-row-icon">${icon(p.kind==='message'?'message':p.kind==='shop'?'shop':'pin')}</span><div class="pin-row-info"><h2>${esc(p.title)}</h2><p>${esc(pinTypes[p.kind])} · ${p.expires?'臨時情報點':'定期情報點'} · ${esc(p.owner_name||state.user.nickname)}</p><p>${esc(p.description)}</p>${!state.demo?`<div class="pin-author">${profileAvatar(p.owner_name,p.owner,p.owner_avatar_url)}<span>查看發布者檔案</span></div>`:''}<button data-action="pin-target" data-id="${esc(p.id)}">在地圖上尋找 ↗</button>${p.can_delete?`<button class="delete-pin" data-action="delete-pin" data-id="${esc(p.id)}" ${pendingPinDeletes.has(p.id)?'disabled aria-busy="true"':''}>${pendingPinDeletes.has(p.id)?'刪除中…':'刪除'}</button>`:''}</div></div>${landmarkFeedback?.controls(p)||''}</article>`).join('');
+    root.innerHTML=`${!state.demo?'<button type="button" class="button outline pins-review-button" data-action="pin-submissions">'+(state.room.owner===state.user.id||state.mine.deputy?'審核圖釘':'我的送審圖釘')+'</button>':''}<div class="intel-create-actions" role="group" aria-label="建立情報點"><button type="button" class="button secondary" data-action="publish-intel" data-lifetime="temporary">${icon('plus')} 臨時情報點</button><button type="button" class="button outline" data-action="publish-intel" data-lifetime="permanent">${icon('pin')} 定期情報點</button></div><p class="field-note">此處可瀏覽隊內地標；地圖依左側追蹤／留言／按讚條件顯示。</p>`+state.pins.filter(match).map(p=>`<article class="pin-row"><div class="pin-row-head"><span class="pin-row-icon">${icon(p.kind==='message'?'message':p.kind==='shop'?'shop':'pin')}</span><div class="pin-row-info"><h2>${esc(p.title)}</h2><p>${esc(pinTypes[p.kind])} · ${p.expires?'臨時情報點':'定期情報點'} · ${esc(p.owner_name||state.user.nickname)}</p><p>${esc(p.description)}</p>${!state.demo?`<div class="pin-author">${profileAvatar(p.owner_name,p.owner,p.owner_avatar_url)}<span>查看發布者檔案</span></div>`:''}<button data-action="pin-target" data-id="${esc(p.id)}">在地圖上尋找 ↗</button>${p.can_delete?`<button class="delete-pin" data-action="delete-pin" data-id="${esc(p.id)}" ${pendingPinDeletes.has(p.id)?'disabled aria-busy="true"':''}>${pendingPinDeletes.has(p.id)?'刪除中…':'刪除'}</button>`:''}</div></div>${landmarkFeedback?.controls(p)||''}</article>`).join('');
   }
 }
 function renderLocation(){
@@ -415,7 +415,7 @@ function showAuth(mode='login'){
 }
 function showAccount(){
   if(!state.authenticated){authIntent=null;return showAuth();}
-  dialog(`<h2>你好，${esc(state.user.nickname)}。</h2><p class="account-username">@${esc(state.user.username)}</p>${TamagoTheme.control()}<form id="profile-form"><label for="profile-nickname">顯示暱稱</label><input id="profile-nickname" name="nickname" required maxlength="24" autocomplete="nickname" value="${esc(state.user.nickname)}"><p class="field-note">修改暱稱不會改變登入帳號或隊伍歸屬。</p><div class="form-error" role="alert"></div><button class="button secondary full" type="submit">儲存暱稱</button></form><div class="account-divider"></div>${state.user.site_admin?'<button type="button" class="button outline full" data-action="site-account-admin">帳號管理</button>':''}<button class="button outline full" data-action="app-display">全螢幕／加入主畫面</button><button class="button outline full" data-action="password-settings">修改密碼</button><button class="button outline full logout-button" data-action="logout">登出這個裝置</button><p class="field-note">登出會停止目前定位分享；遠征隊、任務與地標會保留在帳號中。</p>`);
+  dialog(`<h2>你好，${esc(state.user.nickname)}。</h2><p class="account-username">@${esc(state.user.username)}</p>${TamagoTheme.control()}<form id="profile-form"><label for="profile-nickname">顯示暱稱</label><input id="profile-nickname" name="nickname" required maxlength="24" autocomplete="nickname" value="${esc(state.user.nickname)}"><p class="field-note">修改暱稱不會改變登入帳號或隊伍歸屬。</p><div class="form-error" role="alert"></div><button class="button secondary full" type="submit">儲存暱稱</button></form><div class="account-divider"></div><button type="button" class="button outline full" data-action="blocked-people">黑名單</button>${state.user.site_admin?'<button type="button" class="button outline full" data-action="site-account-admin">帳號管理</button>':''}<button class="button outline full" data-action="app-display">全螢幕／加入主畫面</button><button class="button outline full" data-action="password-settings">修改密碼</button><button class="button outline full logout-button" data-action="logout">登出這個裝置</button><p class="field-note">登出會停止目前定位分享；遠征隊、任務與地標會保留在帳號中。</p>`);
   $('#profile-form').onsubmit=async e=>{e.preventDefault();await submit(e.target,async()=>{state.user={...state.user,...await api('/profile','POST',{nickname:new FormData(e.target).get('nickname')})};render();closeDialog();await refresh();toast('暱稱已更新。');});};
 }
 function showSettings(){
@@ -455,7 +455,7 @@ function showJoin(mode='browse'){
         list.onclick=async event=>{
           const button=event.target.closest('[data-room-id]');if(!button||button.disabled)return;
           button.disabled=true;
-          try{const room=await api(`/expeditions/${button.dataset.roomId}/join`,'POST',{});await finishRoomJoin(room,false);}
+          try{const room=await roomAdmission.join(button.dataset.roomId,state.user.id);if(room)await finishRoomJoin(room,false);}
           catch(error){toast(error.message);button.disabled=false;}
         };
       }catch(error){if(list.isConnected)list.innerHTML=empty('暫時無法載入',error.message);}
@@ -463,12 +463,12 @@ function showJoin(mode='browse'){
     $('#join-venue').onchange=event=>{state.activityVenue=event.target.value;switchVenue(event.target.value);loadCatalog(event.target.value);};
     loadCatalog(activityVenue());return;
   }
-  dialog(`${intro}<p class="field-note">以 ${esc(state.user.nickname)} 的身分${mode==='create'?'建立':'加入'}遠征隊。</p><form id="join-form">${mode==='code'?`<label for="code">遠征隊邀請碼</label><input id="code" name="code" required minlength="8" maxlength="8" pattern="[A-Za-z0-9]{8}" autocapitalize="characters" autocomplete="off" value="${esc(params.get('join')||'')}">`:`<label for="name">遠征隊名稱</label><input id="name" name="name" required maxlength="60" placeholder="例如：一起去看 LIVE！"><label for="venue">活動會場</label><select id="venue" name="venue">${options}</select><label class="choice"><input id="include-date" name="include_date" type="checkbox" aria-controls="event-date-fields"><span><strong>添加活動日期</strong><small>可選填，適合已確定場次的遠征隊。</small></span></label><div id="event-date-fields" hidden><label for="event-date">活動日期</label><input id="event-date" name="event_date" type="date" disabled value="${today()}"></div><label class="choice"><input name="discoverable" type="checkbox" checked><span><strong>顯示在這個場館的遠征隊列表</strong><small>其他登入帳號可直接選擇加入；不勾選則只接受邀請碼。</small></span></label>`}<p class="field-note">座標預設不公開。發布任務後，只有該任務的接取者能取得發布者座標；情報點則分享給整隊。</p><div class="form-error" role="alert"></div><button class="button primary full" type="submit">${mode==='code'?'加入遠征隊':'建立遠征隊'} ${icon('arrow')}</button></form>`);
+  dialog(`${intro}<p class="field-note">以 ${esc(state.user.nickname)} 的身分${mode==='create'?'建立':'加入'}遠征隊。</p><form id="join-form">${mode==='code'?`<label for="code">遠征隊邀請碼</label><input id="code" name="code" required minlength="8" maxlength="8" pattern="[A-Za-z0-9]{8}" autocapitalize="characters" autocomplete="off" value="${esc(params.get('join')||'')}"><label for="expedition-code-password">加入密碼（密碼遠征隊使用）</label><input id="expedition-code-password" name="password" type="password" maxlength="128" autocomplete="off">`:`<label for="name">遠征隊名稱</label><input id="name" name="name" required maxlength="60" placeholder="例如：一起去看 LIVE！"><label for="venue">活動會場</label><select id="venue" name="venue">${options}</select><label class="choice"><input id="include-date" name="include_date" type="checkbox" aria-controls="event-date-fields"><span><strong>添加活動日期</strong><small>可選填，適合已確定場次的遠征隊。</small></span></label><div id="event-date-fields" hidden><label for="event-date">活動日期</label><input id="event-date" name="event_date" type="date" disabled value="${today()}"></div><label class="choice"><input name="discoverable" type="checkbox" checked><span><strong>顯示在這個場館的遠征隊列表</strong><small>其他登入帳號可直接選擇加入；不勾選則只接受邀請碼。</small></span></label>`}<p class="field-note">座標預設不公開。發布任務後，只有該任務的接取者能取得發布者座標；情報點則分享給整隊。</p><div class="form-error" role="alert"></div><button class="button primary full" type="submit">${mode==='code'?'加入遠征隊':'建立遠征隊'} ${icon('arrow')}</button></form>`);
   if(mode==='create')$('#include-date').onchange=event=>{const enabled=event.target.checked;$('#event-date-fields').hidden=!enabled;$('#event-date').disabled=!enabled;$('#event-date').required=enabled;};
   $('#join-form').onsubmit=async event=>{
     event.preventDefault();await submit(event.target,async()=>{
       const f=new FormData(event.target);
-      const room=mode==='code'?await api('/join','POST',{code:f.get('code').toUpperCase(),...(squadInvitation?{squad_code:params.get('squad').toUpperCase()}:{})}):await api('/expeditions','POST',{name:f.get('name'),venue:f.get('venue'),event_date:f.has('include_date')?f.get('event_date'):null,discoverable:f.has('discoverable')});
+      const room=mode==='code'?await api('/join','POST',{code:f.get('code').toUpperCase(),...(f.get('password')?{password:f.get('password')}:{}),...(squadInvitation?{squad_code:params.get('squad').toUpperCase()}:{})}):await api('/expeditions','POST',{name:f.get('name'),venue:f.get('venue'),event_date:f.has('include_date')?f.get('event_date'):null,discoverable:f.has('discoverable')});
       await finishRoomJoin(room,mode==='create');
     });
   };
@@ -591,6 +591,7 @@ async function deletePin(id){
   }finally{pendingPinDeletes.delete(id);if(current())render();}
 }
 function showPublish(type='task',point,options={}){
+  if(!state.demo&&state.mine.muted){toast('你在這支遠征隊已被禁言，暫時無法發布內容。');return;}
   if(state.demo)return showJoin();
   const task=type==='task',fixed=task&&!!point,center=point||map?.getCenter()||venue(),roomId=state.room.id,userId=state.user.id;
   const pos=task&&!fixed?(state.position?{...state.position}:null):{lat:center.lat,lng:center.lng};
@@ -657,12 +658,12 @@ function showPublish(type='task',point,options={}){
       if(state.demo||state.room?.id!==roomId||state.user.id!==userId||!form.isConnected||!$('#dialog').open||$('#publish-form')!==form)throw new Error('發布視窗或遠征隊已變更，請重新開啟後發布。');
       if(task)body.location_mode=!isHelp&&fixed?'fixed':'publisher';
       if(isHelp){body.help_broadcast=true;body.accuracy=helpPoint.accuracy;state.position={lat:helpPoint.lat,lng:helpPoint.lng,accuracy:helpPoint.accuracy};lastPositionAt=helpPoint.timestamp;}
-      await api(`/expeditions/${roomId}/${task?'tasks':'pins'}`,'POST',body);
+      const published=await api(`/expeditions/${roomId}/${task?'tasks':'pins'}`,'POST',body);
       if(state.demo||state.room?.id!==roomId||state.user.id!==userId)return;
       if(task)taskRevision++;else pinRevision++;
       await refresh({fresh:true});
       if(state.demo||state.room?.id!==roomId||state.user.id!==userId||!form.isConnected||$('#publish-form')!==form)return;
-      closeDialog();setTab(task?'tasks':'pins');toast(isHelp?'求助已發布，全遠征隊可查看即時位置；刪除求助後才停止分享。':fixed?'任務旗標已插在選定地點；接取者可查看。':task?'任務已發布；只有接取者能取得你的座標。':body.hours?'臨時情報點已分享，到期後自動隱藏。':'定期情報點已分享，永久保留。');
+      closeDialog();setTab(task?'tasks':'pins');toast(published.pending?'圖釘已送審，核准後才會顯示於地圖。':isHelp?'求助已發布，全遠征隊可查看即時位置；刪除求助後才停止分享。':fixed?'任務旗標已插在選定地點；接取者可查看。':task?'任務已發布；只有接取者能取得你的座標。':body.hours?'臨時情報點已分享，到期後自動隱藏。':'定期情報點已分享，永久保留。');
     });
   };
 }
@@ -819,10 +820,13 @@ document.addEventListener('click',async e=>{
     else if(action==='rooms')showRooms();
     else if(action==='expeditions')showExpeditionPage();
     else if(action==='friends-preview'){closeDialog();setTab('friends');}
+    else if(action==='member-options'&&!state.demo)memberActions.open(state.room.id,id);
+    else if(action==='pin-submissions'&&!state.demo)pinReview.open(state.room);
+    else if(action==='blocked-people')blockedPeople.open();
     else if(action==='site-account-admin')siteAccountAdmin.open();
     else if(action==='settings')showSettings();
     else if(action==='squads'){if(state.demo)showJoin();else{closeDialog();setTab('members');}}
-    else if(action==='manage-members'){const data=await api('/expeditions/owned'),room=data.expeditions.find(room=>room.id===b.dataset.id);if(room)expeditionManagement.open(room);}
+    else if(action==='manage-members'){const data=await api('/expeditions/owned'),room=data.expeditions.find(room=>room.id===b.dataset.id);if(room)roomSettings.open(room);}
     else if(action==='owned-rooms')await showOwnedRooms();
     else if(action==='delete-room')await showDeleteRoom(id);
     else if(action==='confirm-delete-room'){b.disabled=true;try{await deleteRoom(id);}finally{b.disabled=false;}}
@@ -892,15 +896,20 @@ function syncNewsFriends(){
 }
 async function init(){
   icons();
-  expeditionPreview=new ExpeditionPreview({api,dialog,user:()=>state.authenticated?state.user:null,login:()=>{authIntent={kind:'expeditions-page',mode:'browse'};showAuth();},join:async(id,uid)=>{const room=await api(`/expeditions/${encodeURIComponent(id)}/join`,'POST',{});if(state.authenticated&&state.user.id===uid)await finishRoomJoin(room,false);}});
+  roomAdmission=new RoomAdmission({api,dialog,user:()=>state.authenticated?state.user:null});
+  memberActions=new ExpeditionPersonActions({api,toast,user:()=>state.authenticated?state.user:null,friend:id=>chatFriend.open(id),changed:async(uid,eid)=>{await syncRoomChanges(uid,{people:true});if(expeditionPreview?.current()&&expeditionPreview.room.id===eid)await expeditionPreview.load(true);}});
+  blockedPeople=new BlockedPeople({api,dialog,toast,user:()=>state.authenticated?state.user:null,changed:uid=>syncRoomChanges(uid,{people:true})});
+  pinReview=new PinReviewBoard({api,dialog,toast,user:()=>state.authenticated?state.user:null,changed:uid=>syncRoomChanges(uid)});
+  roomSettings=new ExpeditionRoomSettings({api,dialog,toast,user:()=>state.authenticated?state.user:null,changed:uid=>syncRoomChanges(uid,{catalog:true}),submissions:room=>pinReview.open(room),remove:deleteRoom,leave:leaveExpeditionFromMenu});
+  expeditionPreview=new ExpeditionPreview({api,dialog,person:(eid,pid)=>memberActions.open(eid,pid),user:()=>state.authenticated?state.user:null,login:()=>{authIntent={kind:'expeditions-page',mode:'browse'};showAuth();},join:async(id,uid)=>{const room=await roomAdmission.join(id,uid);if(room&&state.authenticated&&state.user.id===uid)await finishRoomJoin(room,false);}});
   siteAccountAdmin=new SiteAccountAdmin({api,dialog,toast,user:()=>state.authenticated?state.user:null});
   expeditionManagement=new ExpeditionMemberManagement({api,dialog,toast,user:()=>state.authenticated?state.user:null,changed:async(uid,renamed)=>{const me=await api('/me');if(state.authenticated&&state.user.id===uid){state.rooms=me.expeditions;if(renamed)expeditionPage?.rename(renamed);if(!state.demo)await refresh({fresh:true});render();if(renamed)chat?.tick();}}});
   expeditionPage=new ExpeditionsPage($('#expeditions-page'),{
-    api,toast,preview:room=>expeditionPreview.open(room),manage:room=>expeditionManagement.open(room),context:()=>({user:state.authenticated?state.user:null,rooms:state.rooms,current:state.demo?null:state.room.id,venues:config?activityVenues():[],venue:config?activityVenue():null}),
+    api,toast,preview:room=>expeditionPreview.open(room),manage:room=>roomSettings.open(room),context:()=>({user:state.authenticated?state.user:null,rooms:state.rooms,current:state.demo?null:state.room.id,venues:config?activityVenues():[],venue:config?activityVenue():null}),
     rooms:rooms=>{state.rooms=rooms;},create:vid=>{state.activityVenue=vid;showJoin('create');},expired:()=>friends?.actions.expired(),back:showMap,
     login:()=>{authIntent={kind:'expeditions-page',mode:expeditionPage.mode};showAuth();},
     enter:async(id,uid)=>{if(!state.authenticated||state.user.id!==uid)return;const room=state.rooms.find(room=>room.id===id);if(!room)throw new Error('隊伍已變更，請重新整理。');if(state.demo||state.room.id!==id)await enterRoom(room,state.user);if(state.authenticated&&state.user.id===uid){showMap();toast('已進入 '+room.name+'。');}},
-    join:async(id,uid)=>{const room=await api(`/expeditions/${encodeURIComponent(id)}/join`,'POST',{});if(state.authenticated&&state.user.id===uid)await finishRoomJoin(room,false);}
+    join:async(id,uid)=>{const room=await roomAdmission.join(id,uid);if(room&&state.authenticated&&state.user.id===uid)await finishRoomJoin(room,false);}
   });
   pinFilters=new PinFilters($('#pin-filter'),$('#pin-filter-handle'),{stage:$('.map-stage'),user:()=>state.authenticated?state.user.id:null,target:()=>state.target,changed:()=>{if(config)render();}});
   landmarkReports=new LandmarkReportBoard({api,toast,user:()=>state.authenticated?state.user:null,refresh:()=>refresh({fresh:true}),context:()=>{const pin=targetPoint();return state.authenticated&&!state.demo&&state.target?.type==='pin'&&pin?.kind!=='message'&&pin?{user:state.user.id,eid:state.room.id,pid:pin.id}:null;}});

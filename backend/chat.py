@@ -74,6 +74,7 @@ class Chat:
 
     def authorize(self, c, uid, kind, target):
         if kind == 'friend':
+            self.accounts.require_unblocked(c,uid,target)
             allowed = c.execute("SELECT 1 FROM friendships WHERE user_a=? AND user_b=? AND status='accepted'",
                                 tuple(sorted((uid, target)))).fetchone()
             if not allowed:
@@ -103,6 +104,9 @@ class Chat:
     def send_message(self,c,uid,kind,target,body,client_id):
         """Caller holds the write transaction; every retry rechecks authorization."""
         thread=self.authorize(c,uid,kind,target)
+        if kind!='friend':
+            eid=target if kind=='expedition' else c.execute('SELECT expedition FROM squads WHERE id=?',(target,)).fetchone()['expedition']
+            self.accounts.require_publish(c,uid,eid)
         previous=c.execute('SELECT * FROM chat_messages WHERE sender=? AND client_id=?',(uid,client_id)).fetchone()
         if previous:
             if (previous['kind'],previous['thread'],previous['body'])!=(kind,thread,body):
@@ -127,13 +131,16 @@ class Chat:
                   LEFT JOIN profile_media a ON a.user=u.id AND a.kind='avatar'
                   WHERE (f.user_a=? OR f.user_b=?) AND f.status='accepted' ''', (uid, uid, uid))]
                 contacts += [dict(r) for r in c.execute('''SELECT 'expedition' AS kind,e.id AS target,
-                  e.name AS title,'遠征隊群聊' AS subtitle FROM members m JOIN expeditions e ON e.id=m.expedition
+                  e.name AS title,'遠征隊群聊' AS subtitle,m.muted FROM members m JOIN expeditions e ON e.id=m.expedition
                   WHERE m.user=?''', (uid,))]
                 contacts += [dict(r) for r in c.execute('''SELECT 'squad' AS kind,s.id AS target,
-                  s.name AS title,e.name||' · 小隊群聊' AS subtitle FROM members m
+                  s.name AS title,e.name||' · 小隊群聊' AS subtitle,m.muted FROM members m
                   JOIN squads s ON s.id=m.squad AND s.expedition=m.expedition
                   JOIN expeditions e ON e.id=m.expedition WHERE m.user=?''',(uid,))]
+                blocked=self.accounts.blocked_ids(c,uid)
+                contacts=[contact for contact in contacts if contact['kind']!='friend' or contact['target'] not in blocked]
                 for contact in contacts:
+                    contact['can_send']=not bool(contact.pop('muted',0))
                     kind, target = contact['kind'], contact['target']
                     digest=contact.pop('avatar_digest',None)
                     contact['avatar_url']=f"/api/profiles/{target}/media/avatar?v={digest}" if kind=='friend' and digest else None

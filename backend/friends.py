@@ -51,6 +51,7 @@ class Friends:
             result = {'friends': [], 'incoming': [], 'outgoing': [], 'sharing': False}
             with self.connect() as c:
                 own = c.execute('SELECT located FROM friend_locations WHERE user=?', (uid,)).fetchone()
+                blocked = self.accounts.blocked_ids(c,uid)
                 result['sharing'] = bool(own and own['located'] >= stamp-self.ttl)
                 rows = c.execute('''SELECT u.id,u.username,u.nickname,f.status,f.requested_by,f.created,
                   p.lat,p.lng,p.accuracy,p.located,a.digest AS avatar_digest FROM friendships f
@@ -59,6 +60,7 @@ class Friends:
                   LEFT JOIN profile_media a ON a.user=u.id AND a.kind='avatar'
                   WHERE f.user_a=? OR f.user_b=? ORDER BY u.nickname,u.id''', (uid, uid, uid))
                 for row in rows:
+                    if row['id'] in blocked:continue
                     person = {k: row[k] for k in ('id', 'username', 'nickname')}
                     person['avatar_url'] = f"/api/profiles/{row['id']}/media/avatar?v={row['avatar_digest']}" if row['avatar_digest'] else None
                     if row['status'] == 'accepted':
@@ -83,6 +85,7 @@ class Friends:
                 if target is None:
                     raise HTTPException(404, '找不到這個帳號，請確認好友的帳號名稱。')
                 other = target['id']
+                self.accounts.require_unblocked(c,uid,other)
                 if uid == other:
                     raise HTTPException(409, '不能加入自己為好友。')
                 pair = tuple(sorted((uid, other)))
@@ -119,6 +122,8 @@ class Friends:
         def accept(other: str, request: Request):
             uid = self.accounts.current_user(request)['id']
             with self.connect() as c:
+                c.execute('BEGIN IMMEDIATE')
+                self.accounts.require_unblocked(c,uid,other)
                 changed = c.execute('''UPDATE friendships SET status='accepted'
                   WHERE user_a=? AND user_b=? AND requested_by=? AND status='pending' ''',
                   (*sorted((uid, other)), other)).rowcount
