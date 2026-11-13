@@ -51,7 +51,7 @@ VENUES = [
     # https://mapfan.com/spots/SC3AH%2CJ%2C1M0
     {"id": "pia", "name": "ぴあアリーナMM(PIA)", "short": "ぴあアリーナMM(PIA)", "lat": 35.4557702, "lng": 139.6284058},
     # Venue pin linked by https://ariake-arena.tokyo/english/ (Google Map).
-    {"id": "ariake", "name": "有明アリーナ", "short": "有明", "lat": 35.6433718, "lng": 139.7941814},
+    {"id": "ariake", "name": "有明アリーナ", "short": "有明アリーナ", "lat": 35.6433718, "lng": 139.7941814},
     # Kanadevia Hall inside Tokyo Dome City's MEETS PORT (not Tokyo Dome stadium):
     # https://www.tokyo-dome.co.jp/zh-CHT/tdc-hall/access/
     {"id": "tokyo-dome-city", "name": "東京巨蛋城（Kanadevia Hall）", "short": "東京巨蛋城", "lat": 35.70332, "lng": 139.75458},
