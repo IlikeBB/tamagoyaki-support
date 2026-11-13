@@ -30,9 +30,9 @@ try{
  await page.locator('#hours').selectOption('0');await expect(page.locator('.coordinate-note .field-note')).toContainText('永久標記不會自動到期');await page.screenshot({path:'artifacts/permanent-landmark-form.png'});
  await page.locator('#publish-form [type=submit]').click();await expect(page.locator('#dialog')).not.toBeVisible();
  const path='/api/expeditions/'+room.id;let snapshot=await (await context.request.get(origin+path)).json();expect(snapshot.pins).toHaveLength(1);expect(snapshot.pins[0].lat).toBe(point.lat);expect(snapshot.pins[0].expires).toBeNull();
- await expect(page.locator('#panel-content')).toContainText('永久標記');await expect(page.locator('#panel-content .landmark-feedback')).toHaveCount(0);
+ await expect(page.locator('#panel-content')).toContainText('永久標記');await expect(page.locator('#panel-content .landmark-feedback')).toHaveCount(1);await expect(page.locator('#panel-content .landmark-feedback [data-value="1"]')).toBeDisabled();
  await page.evaluate(()=>refresh());expect((await (await context.request.get(origin+path)).json()).pins[0].expires).toBeNull();
- checks.push('manual search only; safe result text; outside-range selection expands map; selected place creates a permanent landmark that survives synchronization without an expiry or temporary voting controls');
+ checks.push('manual search only; safe result text; outside-range selection expands map; selected place creates a permanent landmark that survives synchronization without an expiry; author can see feedback but cannot self-vote');
  await page.locator('[data-mobile=map]').click();await page.locator('#place-query').focus();await page.locator('[data-place-create=task]').click();await expect(page.locator('#use-position')).toHaveCount(0);await page.locator('#publish-form [type=submit]').click();await expect(page.locator('#dialog')).not.toBeVisible();
  snapshot=await (await context.request.get(origin+path)).json();expect(snapshot.tasks).toHaveLength(1);expect(snapshot.tasks[0].location_mode).toBe('fixed');expect(snapshot.tasks[0].lng).toBe(point.lng);
  checks.push('a searched location also creates a fixed task flag without requesting GPS');

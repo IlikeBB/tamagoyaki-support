@@ -4,6 +4,8 @@ from typing import Literal
 
 from fastapi import HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
+from .rpg import progression
+from .feedback_history import feedback_history
 
 
 class ProfileDetails(BaseModel):
@@ -13,8 +15,9 @@ class ProfileDetails(BaseModel):
 
 
 class Profiles:
-    def __init__(self,connect,accounts,media,reputation,venues):
+    def __init__(self,connect,accounts,media,reputation,venues,task_feedback):
         self.connect,self.accounts,self.media,self.reputation,self.venues=connect,accounts,media,reputation,venues
+        self.task_feedback=task_feedback
 
     def migrate(self):
         with self.connect() as c:
@@ -70,6 +73,10 @@ class Profiles:
     def public(self,c,uid):
         return self.media.urls(c,uid)
 
+    def totals(self,c,uid):
+        pins=self.reputation.totals(c,uid);tasks=self.task_feedback.totals(c,uid)
+        return {**pins,'likes':pins['likes']+tasks['likes'],'dislikes':pins['dislikes']+tasks['dislikes']}
+
     def wall(self,c,uid,viewer,offset=0):
         # Public room cards reveal only fields already in the public catalogue.
         clause='''FROM expedition_history h JOIN expedition_records e ON e.id=h.expedition
@@ -98,7 +105,8 @@ class Profiles:
                 c.execute('BEGIN');profile=self.target(c,uid);profile.update(self.public(c,uid))
                 bio=c.execute('SELECT bio FROM user_profiles WHERE user=?',(uid,)).fetchone()
                 profile.update(bio=bio['bio'] if bio else '',own=uid==viewer)
-                return {'profile':profile,'reputation':self.reputation.totals(c,uid),'wall':self.wall(c,uid,viewer)}
+                totals=self.totals(c,uid)
+                return {'profile':profile,'reputation':totals,'rpg':progression(totals['likes'],totals['dislikes']),'wall':self.wall(c,uid,viewer)}
 
         @app.patch('/api/profiles/me')
         def update(body: ProfileDetails,request: Request):
@@ -133,28 +141,4 @@ class Profiles:
             if kind=='given' and viewer!=uid:raise HTTPException(403,'只有本人可以查看自己給出的評價。')
             with self.connect() as c:
                 c.execute('BEGIN');self.target(c,uid)
-                if kind=='received':
-                    clause='''FROM landmark_records r LEFT JOIN pins p ON p.id=r.pin WHERE r.owner=?
-                      AND (r.invalidated=1 OR EXISTS(SELECT 1 FROM landmark_reviews v WHERE v.pin=r.pin))
-                      AND (?=? OR EXISTS(SELECT 1 FROM members m WHERE m.user=? AND m.expedition=r.expedition))'''
-                    params=(uid,uid,viewer,viewer)
-                    extra=''
-                else:
-                    clause='''FROM landmark_records r JOIN landmark_reviews v ON v.pin=r.pin
-                      LEFT JOIN pins p ON p.id=r.pin WHERE v.voter=?'''
-                    params=(uid,);extra=',v.value,v.updated'
-                total=c.execute('SELECT COUNT(*) '+clause,params).fetchone()[0]
-                rows=[dict(r) for r in c.execute('''SELECT r.pin,r.owner,r.expedition,r.title,r.kind,r.room_name,
-                  r.venue,r.event_date,r.created,r.invalidated,COALESCE(p.expires,r.expires) AS expires,
-                  p.id IS NULL AS removed,
-                  COALESCE((SELECT SUM(value=1) FROM landmark_reviews WHERE pin=r.pin),0) AS likes,
-                  COALESCE((SELECT SUM(value=-1) FROM landmark_reviews WHERE pin=r.pin),0) AS dislikes'''+extra+' '+clause+
-                  (' ORDER BY v.updated DESC,r.pin' if kind=='given' else ' ORDER BY r.created DESC,r.pin')+' LIMIT 12 OFFSET ?',(*params,offset))]
-                for row in rows:
-                    row['active']=not row['removed'] and row['expires']>int(time.time())
-                    row['can_view']=bool(c.execute('SELECT 1 FROM members WHERE user=? AND expedition=?',(viewer,row['expedition'])).fetchone())
-                    # Own historical votes stay retractable after leaving, but
-                    # the old room's live feedback totals must not leak out.
-                    if kind=='given' and viewer!=row['owner'] and not row['can_view']:
-                        row.pop('likes');row.pop('dislikes')
-                return {'items':rows,'total':total,'next_offset':offset+len(rows) if offset+len(rows)<total else None}
+                return feedback_history(c,uid,viewer,kind,offset)

@@ -26,6 +26,7 @@ from .chat import Chat
 from .reputation import Reputation
 from .profile_media import ProfileMedia
 from .profiles import Profiles
+from .task_feedback import TaskFeedback
 
 ROOT = Path(__file__).resolve().parents[1]
 DB = Path(os.environ.get("TAMAGO_DB", str(ROOT / "data" / "tamagoyaki.sqlite3")))
@@ -92,8 +93,9 @@ friends = Friends(connect, accounts, LOCATION_TTL_SECONDS, help_required=assista
 places = Places(VENUES, PUBLIC_ORIGIN)
 chat = Chat(connect, accounts)
 reputation = Reputation(connect, accounts)
+task_feedback = TaskFeedback(connect, accounts)
 profile_media = ProfileMedia(connect, accounts)
-profiles = Profiles(connect, accounts, profile_media, reputation, ACTIVITY_VENUES)
+profiles = Profiles(connect, accounts, profile_media, reputation, ACTIVITY_VENUES,task_feedback)
 
 
 def prune_empty_squads(c, eid=None):
@@ -161,6 +163,7 @@ def init_db():
     with connect() as c:
         prune_empty_squads(c)
     reputation.migrate()
+    task_feedback.migrate()
     profile_media.migrate()
     profiles.migrate()
 
@@ -197,6 +200,7 @@ friends.install(app)
 assistance.install(app)
 chat.install(app)
 reputation.install(app)
+task_feedback.install(app)
 profile_media.install(app)
 profiles.install(app)
 limits = defaultdict(deque)
@@ -525,6 +529,7 @@ def snapshot(eid: str, request: Request):
                 task['lat'] = None
                 task['lng'] = None
             tasks.append(task)
+        task_feedback.annotate(c,tasks,u['id'])
         pins = [dict(r) for r in c.execute("SELECT p.*,u.nickname AS owner_name FROM pins p JOIN users u ON u.id=p.owner WHERE expedition=? AND (p.expires IS NULL OR p.expires>?) ORDER BY p.created DESC", (eid,stamp))]
         for pin in pins:
             pin['can_delete'] = u['id'] in (pin['owner'], room['owner'])
@@ -629,6 +634,7 @@ def create_task(eid: str, body: TaskInput, request: Request):
         if c.execute("SELECT COUNT(*) FROM tasks WHERE owner=? AND status IN ('open','accepted') AND (expires>? OR help_active=1)",(u["id"],now())).fetchone()[0] >= 30:
             raise HTTPException(409,"進行中的任務已達 30 個。")
         c.execute("INSERT INTO tasks(id,expedition,owner,title,description,kind,lat,lng,status,assignee,created,expires,location_mode,help_active) VALUES(:id,:expedition,:owner,:title,:description,:kind,:lat,:lng,:status,:assignee,:created,:expires,:location_mode,:help_active)",task)
+        task_feedback.record(c,task)
         if is_help:
             c.execute('DELETE FROM friend_locations WHERE user=?',(u['id'],))
             c.execute("UPDATE members SET scope='off',lat=NULL,lng=NULL,accuracy=NULL,located=NULL WHERE user=?",(u['id'],))
@@ -669,6 +675,7 @@ def task_action(eid: str, tid: str, action: Literal["accept","release","complete
         if action in ('complete','cancel') and not c.execute("SELECT 1 FROM tasks WHERE expedition=? AND owner=? AND location_mode='publisher' AND status IN ('open','accepted') AND expires>? LIMIT 1",(eid,t['owner'],now())).fetchone():
             c.execute("UPDATE members SET scope='off',lat=NULL,lng=NULL,accuracy=NULL,located=NULL WHERE expedition=? AND user=? AND scope='task'",(eid,t['owner']))
         assistance.prune(c,t['owner'])
+        task_feedback.record(c,dict(c.execute('SELECT * FROM tasks WHERE id=?',(tid,)).fetchone()))
     return {"ok":True}
 
 
@@ -707,6 +714,7 @@ def leave(eid: str, request: Request):
     with connect() as c:
         c.execute("UPDATE tasks SET status='cancelled' WHERE expedition=? AND owner=? AND status IN ('open','accepted')",(eid,u["id"]))
         c.execute("UPDATE tasks SET status='open',assignee=NULL WHERE expedition=? AND assignee=? AND status='accepted'",(eid,u["id"]))
+        task_feedback.sync_room(c,eid)
         c.execute("DELETE FROM members WHERE expedition=? AND user=?",(eid,u["id"]))
         prune_empty_squads(c,eid)
         assistance.prune(c,u['id'])
