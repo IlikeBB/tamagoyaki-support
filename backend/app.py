@@ -527,10 +527,13 @@ def create_squad(eid: str, body: SquadInput, request: Request):
     u, _ = member(request, eid)
     squad = {"id": secrets.token_hex(10), "expedition": eid, "name": body.name, "code": code()}
     with connect() as c:
+        c.execute('BEGIN IMMEDIATE')
+        if not c.execute('SELECT 1 FROM members WHERE user=? AND expedition=?',(u['id'],eid)).fetchone():
+            raise HTTPException(403,'請先加入這支遠征隊。')
         if c.execute("SELECT COUNT(*) FROM squads WHERE expedition=?", (eid,)).fetchone()[0] >= 100:
             raise HTTPException(409, "小隊數量已達上限。")
         c.execute("INSERT INTO squads VALUES(:id,:expedition,:name,:code)", squad)
-        c.execute("UPDATE members SET squad=?,scope='off',lat=NULL,lng=NULL,located=NULL WHERE user=? AND expedition=?", (squad["id"], u["id"], eid))
+        c.execute("UPDATE members SET squad=?,scope='off',lat=NULL,lng=NULL,accuracy=NULL,located=NULL WHERE user=? AND expedition=?", (squad["id"], u["id"], eid))
     return squad
 
 
@@ -538,11 +541,25 @@ def create_squad(eid: str, body: SquadInput, request: Request):
 def join_squad(eid: str, body: Join, request: Request):
     u, _ = member(request, eid)
     with connect() as c:
+        c.execute('BEGIN IMMEDIATE')
+        if not c.execute('SELECT 1 FROM members WHERE user=? AND expedition=?',(u['id'],eid)).fetchone():
+            raise HTTPException(403,'請先加入這支遠征隊。')
         s = c.execute("SELECT * FROM squads WHERE expedition=? AND code=?", (eid,body.code.upper())).fetchone()
         if s is None:
             raise HTTPException(404, "找不到這個小隊邀請碼。")
-        c.execute("UPDATE members SET squad=?,scope='off',lat=NULL,lng=NULL,located=NULL WHERE user=? AND expedition=?", (s["id"],u["id"],eid))
+        c.execute("UPDATE members SET squad=?,scope='off',lat=NULL,lng=NULL,accuracy=NULL,located=NULL WHERE user=? AND expedition=?", (s["id"],u["id"],eid))
     return dict(s)
+
+
+@app.delete('/api/expeditions/{eid}/squads/{sid}/membership')
+def leave_squad(eid: str, sid: str, request: Request):
+    u,_=member(request,eid)
+    with connect() as c:
+        changed=c.execute("""UPDATE members SET squad=NULL,scope='off',lat=NULL,lng=NULL,accuracy=NULL,located=NULL
+          WHERE user=? AND expedition=? AND squad=?""",(u['id'],eid,sid)).rowcount
+        if not changed:
+            raise HTTPException(409,'目前小隊已變更，請重新整理後操作。')
+    return {'ok':True}
 
 
 @app.put("/api/expeditions/{eid}/location")

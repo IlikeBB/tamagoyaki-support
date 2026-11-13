@@ -412,7 +412,7 @@ function renderPanel(){
       return `<article class="quest"><div class="quest-top"><span class="tag ${esc(t.kind)}">${esc(types[t.kind])}</span><span>${age(t.created)}</span></div><h2>${esc(t.title)}</h2><p>${esc(t.description||'接取任務後，取得發布者位置並前往會合。')}</p><p class="field-note">${privateNote}</p><div class="quest-bottom"><span class="person">${state.demo?avatar(t.owner_name||state.user.nickname,i):profileAvatar(t.owner_name||state.user.nickname,t.owner,t.owner_avatar_url,i)}${esc(t.owner_name||state.user.nickname)}</span><button class="accept" data-action="${!t.help_active&&!own&&!accepted&&t.status==='open'?'accept':'task-target'}" data-id="${esc(t.id)}" ${done||(!t.help_active&&!own&&!accepted&&t.status==='accepted')?'disabled':''}>${caption} ${icon(accepted?'location':'arrow')}</button></div>${t.help_active?(own?`<div class="quest-actions"><button data-action="cancel" data-id="${esc(t.id)}">刪除求助</button></div>`:''):own||accepted?`<div class="quest-actions">${!done?`<button data-action="complete" data-id="${esc(t.id)}">標記完成</button><button data-action="${own?'cancel':'release'}" data-id="${esc(t.id)}">${own?'撤回任務':'放棄接取'}</button>`:''}</div>`:''}${t.status==='accepted'?`<p class="field-note">接取者：${esc(t.assignee_name||'隊友')}</p>`:''}</article>`;
     }).join('')||empty(q?'沒有符合的任務':state.demo?'目前沒有任務':'今天的第一個願望，由你發布。',q?'換個關鍵字試試看。':state.demo?'在場館選擇加入遠征隊，再發布任務。':'按右上角 ＋，發布交換、懸賞或配布物。');
   }else if(state.tab==='members'){
-    root.innerHTML=`<div class="squad-card"><h2>${icon('users')} 遠征隊夥伴</h2>${!state.demo?`<button class="button secondary full" data-action="chat-room">${icon('message')} 遠征隊群聊</button>`:''}<p>每個人可自行選擇分享對象。只有開啟「目前遠征隊」分享的成員，才會在隊伍地圖上顯示即時位置。</p><button class="text-button" data-action="location">${icon('location')} 設定我的分享對象</button><button class="text-button" data-action="publish-intel">${icon('pin')} 為隊友建立情報點</button></div><div class="subheading">${state.members.length} 位遠征夥伴</div>`+state.members.filter(match).map((m,i)=>{const target=expeditionPeople().find(t=>t.owner===m.user)||finderTasks().find(t=>t.owner===m.user);return `<div class="member-row">${state.demo?avatar(m.nickname,i):profileAvatar(m.nickname,m.user,m.avatar_url,i)}<div class="member-info"><strong>${esc(m.nickname)}${m.user===state.user.id?'（你）':''}</strong><small>${m.online?'在線':'離線'} · ${memberSharesLocation(m)?'與遠征隊分享中':'未分享即時位置'}</small></div>${target?`<button data-action="task-target" data-id="${esc(target.id)}">尋找</button>`:''}</div>`;}).join('');
+    root.innerHTML=`${!state.demo?SquadPanel.render(state):''}<div class="squad-card"><h2>${icon('users')} 遠征隊夥伴</h2>${!state.demo?`<button class="button secondary full" data-action="chat-room">${icon('message')} 遠征隊群聊</button>`:''}<p>每個人可自行選擇分享對象。只有開啟「目前遠征隊」分享的成員，才會在隊伍地圖上顯示即時位置。</p><button class="text-button" data-action="location">${icon('location')} 設定我的分享對象</button><button class="text-button" data-action="publish-intel">${icon('pin')} 為隊友建立情報點</button></div><div class="subheading">${state.members.length} 位遠征夥伴</div>`+state.members.filter(match).map((m,i)=>{const target=expeditionPeople().find(t=>t.owner===m.user)||finderTasks().find(t=>t.owner===m.user);return `<div class="member-row">${state.demo?avatar(m.nickname,i):profileAvatar(m.nickname,m.user,m.avatar_url,i)}<div class="member-info"><strong>${esc(m.nickname)}${m.user===state.user.id?'（你）':''}</strong><small>${m.online?'在線':'離線'} · ${memberSharesLocation(m)?'與遠征隊分享中':'未分享即時位置'}</small></div>${target?`<button data-action="task-target" data-id="${esc(target.id)}">尋找</button>`:''}</div>`;}).join('');
   }else{
     root.innerHTML=(!state.demo?'<button class="button secondary full" data-action="ground-message">原地建立留言</button>':'')+`<p class="field-note">情報點分享給同一遠征隊的隊員。長按地圖可標記地標，選擇限時或永久保留；可由建立者或管理員（隊長）刪除；臨時地標的無效票多於有效票時自動移除，紀錄保留。</p>`+state.pins.filter(match).map(p=>`<article class="pin-row"><div class="pin-row-head"><span class="pin-row-icon">${icon(p.kind==='message'?'message':p.kind==='shop'?'shop':'pin')}</span><div class="pin-row-info"><h2>${esc(p.title)}</h2><p>${esc(pinTypes[p.kind])} · ${p.expires?'限時標記':'永久標記'} · ${esc(p.owner_name||state.user.nickname)}</p><p>${esc(p.description)}</p>${!state.demo?`<div class="pin-author">${profileAvatar(p.owner_name,p.owner,p.owner_avatar_url)}<span>查看發布者檔案</span></div>`:''}<button data-action="pin-target" data-id="${esc(p.id)}">在地圖上尋找 ↗</button>${p.can_delete?`<button class="delete-pin" data-action="delete-pin" data-id="${esc(p.id)}">刪除</button>`:''}</div></div>${landmarkFeedback?.controls(p)||''}</article>`).join('');
   }
@@ -488,7 +488,7 @@ function showJoin(mode='browse'){
   const title=mode==='create'?'號召同一場的夥伴。':mode==='code'?'用邀請碼加入。':'加入這一場的遠征隊。';
   const intro=`<h2>${title}</h2><p>隊員彼此不會看到座標；大家都能發布任務，分享現場情報。</p>${tabs}`;
   if(mode==='browse'){
-    dialog(`${intro}<label for="join-venue">選擇活動會場</label><select id="join-venue">${options}</select><div id="venue-catalog" aria-live="polite"><p class="field-note">正在載入遠征隊…</p></div><button class="button primary full" data-action="create-mode">＋ 建立這個場館的遠征隊</button><button class="button outline full" data-action="owned-rooms">管理我建立的遠征隊</button>`);
+    dialog(`${intro}<label for="join-venue">選擇活動會場</label><select id="join-venue">${options}</select><div id="venue-catalog" aria-live="polite"><p class="field-note">正在載入遠征隊…</p></div><button class="button primary full" data-action="create-mode">＋ 建立這個場館的遠征隊</button>${!state.demo?`<button class="button outline full" data-action="manage-squads">遠征隊內的小隊組合</button>`:''}<button class="button outline full" data-action="owned-rooms">管理我建立的遠征隊</button>`);
     let generation=0;
     async function loadCatalog(vid){
       const current=++generation,list=$('#venue-catalog');
@@ -541,10 +541,11 @@ async function enterRoom(room,u,{preserveMap=false}={}){
   await refresh();focusRegion();
   const me=await api('/me');state.rooms=me.expeditions;state.user={...u,...me.user};
 }
-async function refresh(){
-  if(state.demo||refreshing||document.hidden)return;
-  refreshing=true;
+async function refresh({fresh=false}={}){
+  if(state.demo||document.hidden)return;
   const roomId=state.room.id,userId=state.user.id;
+  if(refreshing){const pending=refreshing;await pending;if((fresh||pending.context!==roomId+':'+userId)&&state.room.id===roomId&&state.user.id===userId)return refresh();return;}
+  refreshing=(async()=>{
   try{
     const data=await api(`/expeditions/${roomId}`);
     if(state.demo||state.room.id!==roomId||state.user.id!==userId)return;
@@ -559,6 +560,7 @@ async function refresh(){
     else{state.online=false;state.members=state.members.map(m=>({...m,lat:null,lng:null}));render();}
   }
   finally{refreshing=false;}
+  })();refreshing.context=roomId+':'+userId;return refreshing;
 }
 function showInvite(squad=false){
   if(state.demo)return showJoin('create');const s=squad?currentSquad():state.room;if(!s)return;
@@ -567,13 +569,28 @@ function showInvite(squad=false){
 }
 function showRooms(){
   if(state.demo)return showJoin();
-  dialog(`<h2>今天，去哪裡遠征？</h2><p>選擇遠征隊，或和另一群朋友出發。</p>${state.rooms.map(r=>`<button class="room-item" data-action="switch-room" data-id="${esc(r.id)}"><span><strong>${esc(r.name)}</strong><small>${esc(activityDate(r.event_date))} · 邀請碼 ${esc(r.code)}</small></span>${icon('chevron')}</button>`).join('')}<button class="button primary full" data-action="join">＋ 加入或建立遠征隊</button><button class="button outline full" data-action="leave">退出目前遠征隊</button><button class="button outline full" data-action="owned-rooms">管理我建立的遠征隊</button>${state.room.owner===state.user.id?`<button class="button outline full logout-button" data-action="delete-room" data-id="${esc(state.room.id)}">刪除目前遠征隊</button>`:''}`);
+  dialog(`<h2>今天，去哪裡遠征？</h2><p>選擇遠征隊，或和另一群朋友出發。</p>${state.rooms.map(r=>`<button class="room-item" data-action="switch-room" data-id="${esc(r.id)}"><span><strong>${esc(r.name)}</strong><small>${esc(activityDate(r.event_date))} · 邀請碼 ${esc(r.code)}</small></span>${icon('chevron')}</button>`).join('')}<button class="button primary full" data-action="join">＋ 加入或建立遠征隊</button><button class="button outline full" data-action="leave">退出目前遠征隊</button><button class="button outline full" data-action="manage-squads">遠征隊內的小隊組合</button><button class="button outline full" data-action="owned-rooms">管理我建立的遠征隊</button>${state.room.owner===state.user.id?`<button class="button outline full logout-button" data-action="delete-room" data-id="${esc(state.room.id)}">刪除目前遠征隊</button>`:''}`);
 }
 function showSquad(mode){
   if(state.demo)return showJoin();
-  const create=mode==='create';
-  dialog(`<h2>${create?'小隊集合！':'加入同行小隊。'}</h2><p>同一個遠征隊裡，和最熟的夥伴保持聯繫。切換小隊不影響已開啟的好友分享。</p><form id="squad-form"><label for="squad-value">${create?'小隊名稱':'小隊邀請碼'}</label><input id="squad-value" name="value" required maxlength="${create?30:8}" ${create?'':'minlength="8" pattern="[A-Za-z0-9]{8}"'} placeholder="${create?'例如：玉子燒小隊':'8 位小隊邀請碼'}"><div class="form-error" role="alert"></div><button class="button primary full" type="submit">${create?'建立小隊':'加入小隊'}</button></form>`);
-  $('#squad-form').onsubmit=async e=>{e.preventDefault();await submit(e.target,async()=>{const value=new FormData(e.target).get('value');await stopTeamLocation();await api(`/expeditions/${state.room.id}/squads${create?'':'/join'}`,'POST',create?{name:value}:{code:value.toUpperCase()});await refresh();closeDialog();toast('小隊已就位，可用左側篩選顯示同小隊隊友。');});};
+  const create=mode==='create',roomId=state.room.id,userId=state.user.id;
+  dialog(`<h2>${create?'小隊集合！':'加入同行小隊。'}</h2><p>每人在同一遠征隊中同時加入一個小隊。建立或加入新小隊會切換分組，並關閉原有的遠征隊／任務定位分享；好友分享及求助定位不受影響。</p><form id="squad-form"><label for="squad-value">${create?'小隊名稱':'小隊邀請碼'}</label><input id="squad-value" name="value" required maxlength="${create?30:8}" ${create?'':'minlength="8" pattern="[A-Za-z0-9]{8}"'} placeholder="${create?'例如：玉子燒小隊':'8 位小隊邀請碼'}"><div class="form-error" role="alert"></div><button class="button primary full" type="submit">${create?'建立小隊':'加入小隊'}</button></form>`);
+  $('#squad-form').onsubmit=async e=>{e.preventDefault();await submit(e.target,async()=>{
+    if(state.demo||state.room.id!==roomId||state.user.id!==userId)throw new Error('遠征隊已變更，請重新開啟小隊設定。');
+    const value=new FormData(e.target).get('value');await stopTeamLocation();
+    if(state.demo||state.room.id!==roomId||state.user.id!==userId||!e.target.isConnected)throw new Error('遠征隊或視窗已變更，請重新開啟。');
+    await api(`/expeditions/${roomId}/squads${create?'':'/join'}`,'POST',create?{name:value}:{code:value.toUpperCase()});await refresh({fresh:true});
+    if(state.room.id!==roomId||state.user.id!==userId||!e.target.isConnected)return;
+    closeDialog();setTab('members');toast(create?'小隊已建立，使用「邀請加入小隊」分享邀請碼。':'已加入小隊，可用地圖「隊友」篩選查看已授權的位置。');
+  });};
+}
+async function leaveSquad(id){
+  if(state.demo||state.mine.squad!==id)return;
+  const roomId=state.room.id,userId=state.user.id;
+  await stopTeamLocation();
+  if(state.room.id!==roomId||state.user.id!==userId)return;
+  await api(`/expeditions/${roomId}/squads/${encodeURIComponent(id)}/membership`,'DELETE');await refresh({fresh:true});
+  if(state.room.id===roomId&&state.user.id===userId){setTab('members');toast('已離開小隊，仍保留遠征隊成員資格。');}
 }
 function showPublish(type='task',point){
   if(state.demo)return showJoin();
@@ -686,7 +703,12 @@ async function stopLocation({revoke=false,keepHelp=false,preservePosition=false}
 }
 async function stopTeamLocation(){
   if(assistance?.active)return;
-  if(!friends?.sharing)return stopLocation();
+  if(!friends?.sharing&&!friends?.data.sharing)return stopLocation();
+  if(!friends.sharing){
+    locationGeneration++;lastPublishedSampleAt=0;
+    if(state.watch!=null)navigator.geolocation.clearWatch(state.watch);
+    state.watch=null;state.scope='off';state.position=null;
+  }
   await locationWrites.catch(()=>{});
   if(!state.demo&&state.room?.id)await api(`/expeditions/${state.room.id}/location`,'DELETE');
   state.mine.scope='off';lastSent=0;
@@ -784,6 +806,8 @@ document.addEventListener('click',async e=>{
     else if(action==='confirm-delete-room'){b.disabled=true;try{await deleteRoom(id);}finally{b.disabled=false;}}
     else if(action==='invite')showInvite();
     else if(action==='squad-invite')showInvite(true);
+    else if(action==='manage-squads'){closeDialog();setTab('members');}
+    else if(action==='leave-squad'){b.disabled=true;try{await leaveSquad(id);}finally{b.disabled=false;}}
     else if(action==='help')help();
     else if(action==='create-squad'||action==='join-squad')showSquad(action==='create-squad'?'create':'join');
     else if(action==='publish')showPublish(state.tab==='tasks'?'task':'pin');
