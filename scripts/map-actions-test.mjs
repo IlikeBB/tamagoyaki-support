@@ -16,7 +16,7 @@ try{
   const response=await a.context.request.post(origin+'/api/expeditions',{data:{name:'長按驗證 '+suffix,venue:'makuhari',event_date:new Date().toISOString().slice(0,10)}});
   expect(response.ok()).toBe(true);const room=await response.json(),path='/api/expeditions/'+room.id;
   for(const user of [b,c])expect((await user.context.request.post(origin+'/api/join',{data:{code:room.code}})).ok()).toBe(true);
-  for(const user of users){user.page.on('pageerror',e=>errors.push(e.message));await user.page.goto(origin);await expect(user.page.locator('.region-boundary')).toBeVisible();await expect.poll(()=>user.page.evaluate(()=>!state.demo&&lastTeamSyncAt>0)).toBe(true);}
+  for(const user of users){user.page.on('pageerror',e=>errors.push(e.message));await user.page.goto(origin);await expect(user.page.locator('.region-boundary')).toBeVisible();await expect.poll(()=>user.page.evaluate(()=>!state.demo&&lastTeamSyncAt>0)).toBe(true);await user.page.evaluate(()=>setPeopleFilter('expedition'));}
   const page=b.page;
   let pointOffset=0;
   async function point(){const r=await page.locator('#map').boundingBox();return {x:r.x+r.width*(pointOffset?.38:.64),y:r.y+r.height*(pointOffset?.38:.51)};}

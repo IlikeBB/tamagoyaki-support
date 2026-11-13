@@ -1,0 +1,9 @@
+.ground-message-marker{display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--orange)}
+.ground-message-marker>span{display:grid;place-items:center;width:40px;height:28px;border:1px solid var(--orange);border-radius:8px;background:var(--orange-soft);box-shadow:0 2px 6px #293e361f}
+.ground-message-marker svg{width:21px;height:21px}
+.ground-message-marker small{padding:0 4px;border-radius:3px;background:var(--surface);font-size:9px;color:var(--ink);white-space:nowrap}
+.ground-message-copy{max-height:160px;overflow-y:auto;overscroll-behavior:contain;margin:12px 0;padding:12px;border-left:3px solid var(--orange);border-radius:0 6px 6px 0;background:var(--orange-soft);font-size:13px;line-height:1.9;white-space:pre-wrap;overflow-wrap:anywhere}
+.ground-message-author{display:flex;align-items:center;gap:8px;font-size:10px;color:var(--muted);margin:8px 0}
+.target-card:has(.ground-message-copy){max-height:min(500px,calc(var(--app-height,100dvh) - 240px));overflow-y:auto}
+#ground-message-form textarea{min-height:120px}
+.map-create-symbol.ground-message{background:var(--orange-soft);color:var(--orange)}

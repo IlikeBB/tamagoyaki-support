@@ -299,7 +299,7 @@ class TaskInput(Position):
 class PinInput(Position):
     title: str = Field(min_length=1, max_length=80)
     description: str = Field(default="", max_length=600)
-    kind: Literal["booth", "toilet", "shop", "meet", "other"]
+    kind: Literal["booth", "toilet", "shop", "meet", "other", "message"]
     hours: int = Field(default=6, ge=0, le=168)
 
 
