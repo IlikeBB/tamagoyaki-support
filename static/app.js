@@ -415,8 +415,9 @@ function render(){
   $('#member-count').textContent=state.members.length;$('#pin-count').textContent=state.pins.length;
   $('#friend-count').textContent=friends?.data.friends.length||0;
   $$('.section-nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===state.tab));
-  const names={tasks:['QUEST BOARD','現場的願望，現場實現。'],members:['PARTY MEMBERS','一起遠征，位置自己決定。'],friends:['FRIENDS','不必同隊，也能找到彼此。'],pins:['TEAM INTELLIGENCE','把現場情報，分享給隊友。']};
+  const names={tasks:['QUEST BOARD','現場的願望，現場實現。'],members:['PARTY MEMBERS','一起遠征，位置自己決定。'],friends:['FRIENDS',''],pins:['TEAM INTELLIGENCE','把現場情報，分享給隊友。']};
   $('#panel-eyebrow').textContent=names[state.tab][0];$('#panel-title').textContent=names[state.tab][1];
+  $('#panel-title').classList.toggle('hidden',!names[state.tab][1]);
   $('.panel-heading').classList.toggle('hidden',state.tab==='members');
   $('#publish-small').setAttribute('aria-label',state.tab==='pins'?'發布地標':state.tab==='members'?'建立情報點':'發布任務');
   $('#publish-small').classList.toggle('hidden',state.tab==='friends');
