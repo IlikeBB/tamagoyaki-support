@@ -45,10 +45,10 @@ try{
  await expect(b.page.locator('#region-toggle')).toHaveAttribute('aria-pressed','false');
  await markerCount(b.page,1);await expect(b.page.locator('#finder-name')).toHaveText('小狐 <img src=x>');await expect(b.page.locator('#finder-source')).toContainText('好友即時位置');
  await expect(b.page.locator('.teammate-map-point img')).toHaveCount(0);await b.page.locator('#finder-close').click();
- await gps(b.page,false);await expect(b.page.locator('.radar-chip')).toHaveCount(1);await expect(b.page.locator('.teammate-map-needle .direction-needle')).toHaveCount(1);
+ await gps(b.page,false);await expect(b.page.locator('.radar-chip')).toHaveCount(1);await expect(b.page.locator('.friend-map-point .presence-fan svg')).toHaveCount(1);
  expect((await call(a.page,'/friends')).friends[0].location_visible).toBe(false);
  expect((await call(c.page,'/friends')).friends).toEqual([]);
- checks.push('opt-in Taiwan location and beautiful arrows visible to accepted friends only');
+ checks.push('opt-in Taiwan location and direction fans visible to accepted friends only');
  const room=await call(a.page,'/expeditions','POST',{name:'好友篩選驗證 '+suffix,venue:'makuhari',event_date:new Date().toISOString().slice(0,10)});
  await call(b.page,'/join','POST',{code:room.code});await call(c.page,'/join','POST',{code:room.code});
  const squad=await call(a.page,`/expeditions/${room.id}/squads`,'POST',{name:'同行好友'});

@@ -1,0 +1,11 @@
+:root{--presence-self:#1aafce}
+.map-presence,.map-presence.teammate-map-point{--presence-color:var(--orange);position:relative;display:grid;place-items:center;width:40px;height:40px;isolation:isolate;border:0;border-radius:50%;background:transparent;color:var(--presence-color);box-shadow:none}
+.map-presence.presence-self{--presence-color:var(--presence-self)}.map-presence.presence-friend{--presence-color:var(--green)}.map-presence.presence-member{--presence-color:var(--blue)}
+.presence-halo{position:absolute;inset:-14px;border:1px solid currentColor;border-radius:50%;background:currentColor;opacity:.19;pointer-events:none}
+.presence-fan{position:absolute;inset:-44px;display:block;width:128px;height:128px;transform-origin:50% 50%;pointer-events:none}
+.presence-fan svg{display:block;width:128px;height:128px;fill:currentColor;stroke:none;overflow:visible}
+.presence-core{position:relative;z-index:1;display:grid;place-items:center;width:28px;height:28px;border:3px solid var(--surface);border-radius:50%;background:var(--presence-color);color:white;box-shadow:0 1px 4px #293e3640;font-size:11px;font-weight:700}
+.presence-self .presence-core{width:20px;height:20px;background:var(--yellow);border-width:3px;box-shadow:0 0 0 2px #fffefa70,0 1px 4px #293e3626}
+.presence-core .teammate-map-relation{width:18px;height:18px}.presence-core .teammate-map-relation svg{width:17px;height:17px;stroke-width:2}
+.map-presence .presence-label{top:43px;border-color:var(--line);font-weight:600;max-width:150px;pointer-events:none}.presence-self .presence-label{color:var(--ink)}
+.map-presence.is-last-known .presence-halo{background:transparent;opacity:.6;border:2px dashed currentColor}.map-presence.is-last-known .presence-fan{opacity:.45}.map-presence.is-last-known .presence-core{opacity:.8}

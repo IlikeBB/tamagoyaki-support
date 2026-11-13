@@ -262,8 +262,15 @@ async function initMap(forceLeaflet=false){
 function marker(point,html,label,onClick){
   if(!map||point.lat==null)return;
   if(map.isGoogle)return map.addMarker(point,html,label,onClick,layers);
-  const m=L.marker([point.lat,point.lng],{icon:L.divIcon({html,className:'custom-marker',iconSize:[40,40],iconAnchor:[20,20]}),title:label,alt:label,keyboard:true}).addTo(layers);
-  if(onClick)m.on('click',onClick);
+  const m=L.marker([point.lat,point.lng],{icon:L.divIcon({html,className:'custom-marker',iconSize:[40,40],iconAnchor:[20,20]}),title:label,alt:label,keyboard:!!onClick}).addTo(layers);
+  if(onClick){
+    m.on('click',onClick);
+    m.getElement().addEventListener('keydown',event=>{
+      if(!['Enter',' '].includes(event.key))return;event.preventDefault();event.stopPropagation();
+      if(event.key==='Enter'&&!event.repeat)onClick();
+    });
+    m.getElement().addEventListener('keyup',event=>{if(event.key===' '){event.preventDefault();event.stopPropagation();onClick();}});
+  }
   return m;
 }
 function renderMap(){
@@ -291,16 +298,22 @@ function renderMap(){
     }else marker(t,`<div class="map-pin">${icon(t.kind==='giveaway'?'gift':'flag')}</div>`,t.title,()=>selectTarget('task',t.id));
   });
   sharedPoints.filter(inRegion).forEach(personMarker);
-  if(inRegion(state.position)&&!state.tasks.some(t=>t.help_active&&t.owner===state.user.id&&t.location_visible&&inRegion(t)))marker(state.position,`<div class="map-avatar">${avatar('你')}<span class="map-label">你 · ${LocationState.stale(lastPositionAt/1000)?`最後位置 · ${LocationState.age(lastPositionAt/1000)}`:`±${Math.round(state.position.accuracy)}m`}</span></div>`,'我的位置');
+  if(state.position&&LocationState.valid(lastPositionAt/1000)&&inRegion(state.position)&&!state.tasks.some(t=>t.help_active&&t.owner===state.user.id&&t.location_visible&&inRegion(t))){
+    const stale=LocationState.stale(lastPositionAt/1000),accuracy=Number.isFinite(state.position.accuracy)?`±${Math.round(state.position.accuracy)}m`:'目前位置';
+    marker(state.position,MapPresence.render({kind:'self',angle:stale?null:state.heading,lastKnown:stale,label:`你 · ${stale?`最後位置 · ${LocationState.age(lastPositionAt/1000)}`:accuracy}`}),'我的位置');
+    MapPresence.updateSelf($('#map .self-map-point'),stale?null:state.heading);
+  }
   renderRadar();renderTarget();renderPeopleFilter();
 }
 function personMarker(t){
   if(t.help_shared||t.help_active)return marker(t,`<div class="help-map-marker" aria-hidden="true">!</div>${LocationState.lastKnown(t)?`<span class="teammate-map-label">最後位置 · ${LocationState.age(t.located)}</span>`:''}`,`${t.owner_name} · ${LocationState.source(t)}`,()=>selectTarget(['friend','member'].includes(t.kind)?t.kind:'task',t.id));
-  const hasPosition=!!state.position&&LocationState.valid(lastPositionAt/1000),angle=hasPosition?bearing(state.position,t):0;
-  const relation=t.kind==='friend'?'heart':t.kind==='member'?'users':null;
-  const symbol=relation?`<span class="teammate-map-relation" aria-hidden="true">${icon(relation)}</span>${hasPosition?`<span class="teammate-map-needle relationship-map-direction" style="transform:rotate(${angle}deg)">${directionNeedle}</span>`:''}`:`<span class="teammate-map-needle" style="transform:rotate(${angle}deg)">${hasPosition?directionNeedle:icon('users')}</span><span class="teammate-map-initial">${esc([...(t.owner_name||'隊友')][0])}</span>`;
-  const html=`<div class="teammate-map-point ${t.kind==='friend'?'friend-map-point':t.kind==='member'?'expedition-map-point':''}">${symbol}<span class="teammate-map-label">${esc(t.owner_name)}${LocationState.lastKnown(t)?` · 最後位置 · ${LocationState.age(t.located)}`:t.kind==='friend'?' · 好友':t.kind==='member'?' · 遠征隊':''}</span></div>`;
-  marker(t,html,`${t.owner_name} · ${t.title}`,()=>selectTarget(['friend','member'].includes(t.kind)?t.kind:'task',t.id));
+  const hasPosition=!!state.position&&LocationState.valid(lastPositionAt/1000),angle=hasPosition?bearing(state.position,t):null;
+  const relation=t.kind==='friend'?'heart':t.kind==='member'?'users':null,stale=LocationState.lastKnown(t),ownStale=hasPosition&&LocationState.stale(lastPositionAt/1000);
+  const symbol=relation?`<span class="teammate-map-relation">${icon(relation)}</span>`:esc([...(t.owner_name||'隊友')][0]);
+  const label=`${esc(t.owner_name)}${stale?` · 最後位置 · ${LocationState.age(t.located)}`:t.kind==='friend'?' · 好友':t.kind==='member'?' · 遠征隊':''}${ownStale?' · 方位估算':''}`;
+  const html=MapPresence.render({kind:t.kind,angle,symbol,label,lastKnown:stale||ownStale});
+  const guidance=angle===null?'取得你的位置後可顯示方位':`從你的位置往${direction(angle)}方向${ownStale?' · 依最後位置估算':''}`;
+  marker(t,html,`${t.owner_name} · ${t.title} · ${guidance}`,()=>selectTarget(['friend','member'].includes(t.kind)?t.kind:'task',t.id));
 }
 function renderRadar(){
   const root=$('#radar');
@@ -787,9 +800,10 @@ async function compass(){
   }catch{toast('此瀏覽器無法啟用指南針，方向維持北朝上。');}
 }
 function onOrientation(e){
-  if(typeof e.webkitCompassHeading==='number')state.heading=(e.webkitCompassHeading+(screen.orientation?.angle||0))%360;
-  else if(e.absolute&&typeof e.alpha==='number')state.heading=(360-e.alpha+(screen.orientation?.angle||0))%360;
+  if(Number.isFinite(e.webkitCompassHeading))state.heading=(e.webkitCompassHeading+(screen.orientation?.angle||0))%360;
+  else if(e.absolute&&Number.isFinite(e.alpha))state.heading=(360-e.alpha+(screen.orientation?.angle||0))%360;
   else return;
+  MapPresence.updateSelf($('#map .self-map-point'),LocationState.valid(lastPositionAt/1000)&&!LocationState.stale(lastPositionAt/1000)?state.heading:null);
   renderRadar();renderTarget();
 }
 async function taskAction(id,action){
