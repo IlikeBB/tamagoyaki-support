@@ -71,7 +71,7 @@ try{
   await b.locator('#finder-close').click();
   await b.locator('.mobile-tabs [data-tab=members]').click();await expect(b.locator('.member-row')).toHaveCount(3);await expect(b.locator('.member-row [data-action=task-target]')).toHaveCount(0);await expect(b.locator('.member-row [data-action=view-profile]')).toHaveCount(3);
   await expect(b.locator('#panel-content')).toContainText('未分享即時位置');await b.screenshot({path:'artifacts/private-members-mobile.png'});
-  await b.locator('[data-action=publish-intel]').click();await expect(b.locator('#dialog')).toContainText('情報點');await b.locator('#dialog [data-action=close]').click();
+  await expect(b.locator('.squad-card')).toHaveCount(0);await b.locator('.mobile-tabs [data-tab=pins]').click();await b.locator('[data-action=publish]').click();await expect(b.locator('#dialog')).toContainText('標記地標');await b.locator('#dialog [data-action=close]').click();
   checks.push('member list has no personal-coordinate or find-teammate controls');
   await a.locator('.mobile-tabs [data-mobile=map]').click();for(const width of [320,390,768,1024,1440]){await a.setViewportSize({width,height:900});expect(await a.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
   await a.screenshot({path:'artifacts/private-expedition-desktop.png'});await c.reload();await expect(c.locator('#room-name')).toHaveText(room.name);expect(noMemberCoordinates(await snapshot(c,room.id))).toBe(true);

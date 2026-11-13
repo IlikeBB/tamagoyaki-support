@@ -96,6 +96,11 @@ profile_media = ProfileMedia(connect, accounts)
 profiles = Profiles(connect, accounts, profile_media, reputation, ACTIVITY_VENUES)
 
 
+def prune_empty_squads(c, eid=None):
+    c.execute('''DELETE FROM squads WHERE (? IS NULL OR expedition=?)
+      AND NOT EXISTS (SELECT 1 FROM members WHERE members.squad=squads.id)''',(eid,eid))
+
+
 def init_db():
     DB.parent.mkdir(parents=True, exist_ok=True)
     with connect() as c:
@@ -136,7 +141,9 @@ def init_db():
         );
         CREATE INDEX IF NOT EXISTS tasks_expedition ON tasks(expedition);
         CREATE INDEX IF NOT EXISTS pins_expedition ON pins(expedition);
+        CREATE INDEX IF NOT EXISTS members_squad ON members(squad);
         """)
+        prune_empty_squads(c)
     accounts.migrate()
     friends.migrate()
     with connect() as c:
@@ -534,6 +541,7 @@ def create_squad(eid: str, body: SquadInput, request: Request):
             raise HTTPException(409, "小隊數量已達上限。")
         c.execute("INSERT INTO squads VALUES(:id,:expedition,:name,:code)", squad)
         c.execute("UPDATE members SET squad=?,scope='off',lat=NULL,lng=NULL,accuracy=NULL,located=NULL WHERE user=? AND expedition=?", (squad["id"], u["id"], eid))
+        prune_empty_squads(c,eid)
     return squad
 
 
@@ -548,6 +556,7 @@ def join_squad(eid: str, body: Join, request: Request):
         if s is None:
             raise HTTPException(404, "找不到這個小隊邀請碼。")
         c.execute("UPDATE members SET squad=?,scope='off',lat=NULL,lng=NULL,accuracy=NULL,located=NULL WHERE user=? AND expedition=?", (s["id"],u["id"],eid))
+        prune_empty_squads(c,eid)
     return dict(s)
 
 
@@ -559,6 +568,7 @@ def leave_squad(eid: str, sid: str, request: Request):
           WHERE user=? AND expedition=? AND squad=?""",(u['id'],eid,sid)).rowcount
         if not changed:
             raise HTTPException(409,'目前小隊已變更，請重新整理後操作。')
+        prune_empty_squads(c,eid)
     return {'ok':True}
 
 
@@ -694,6 +704,7 @@ def leave(eid: str, request: Request):
         c.execute("UPDATE tasks SET status='cancelled' WHERE expedition=? AND owner=? AND status IN ('open','accepted')",(eid,u["id"]))
         c.execute("UPDATE tasks SET status='open',assignee=NULL WHERE expedition=? AND assignee=? AND status='accepted'",(eid,u["id"]))
         c.execute("DELETE FROM members WHERE expedition=? AND user=?",(eid,u["id"]))
+        prune_empty_squads(c,eid)
         assistance.prune(c,u['id'])
         help_rooms=assistance.rooms(c,u['id'])
     return {"ok":True,"help_rooms":help_rooms}

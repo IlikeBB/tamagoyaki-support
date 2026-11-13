@@ -44,5 +44,11 @@ try{
  expect((await api(b,'/friends')).friends.find(person=>person.id===a.user.id).location_visible).toBe(true);
  await b.page.evaluate(()=>refresh({fresh:true}));await expect(b.page.locator('.squad-group.is-current h3')).toHaveText('南口 <img src=x> 小隊');
  checks.push('phone and desktop layouts fit; joining another squad switches only yourself; leaving retains expedition membership and preserves friend sharing from another page without exposing team GPS');
+ await b.page.locator('.squad-group.is-current [data-action=leave-squad]').click();await expect(b.page.locator(`[data-squad-id="${first.id}"]`)).toHaveCount(0);
+ await a.page.evaluate(()=>refresh({fresh:true}));await expect(a.page.locator('.squad-group')).toHaveCount(1);await expect(a.page.locator('.squad-card')).toHaveCount(0);await expect(a.page.locator('.member-row')).toHaveCount(3);
+ const expired=await b.page.request.post(origin+'/api'+path+'/squads/join',{data:{code:first.code},headers});expect(expired.status()).toBe(404);
+ await api(c,path+'/membership','DELETE');await a.page.evaluate(()=>refresh({fresh:true}));await expect(a.page.locator('.squad-group')).toHaveCount(0);await expect(a.page.locator('.squad-empty')).toContainText('還沒有小隊');
+ expect((await api(a,'/me')).expeditions.some(item=>item.id===room.id)).toBe(true);
+ checks.push('last member leaving or exiting the expedition dissolves only the empty squad and invalidates its code; removed companion card stays absent while member list remains');
  expect(errors).toEqual([]);console.log(JSON.stringify({ok:true,checks,errors}));
 }finally{await browser.close();}
