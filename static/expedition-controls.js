@@ -13,4 +13,4 @@ async function leaveExpeditionFromMenu(id,uid){
   assistance?.sync(result.help_rooms||[]);if(current){resetLobby();try{localStorage.removeItem('tamago-room');}catch{}}
   state.rooms=state.rooms.filter(room=>room.id!==id);if(roomSettings?.room.id===id&&roomSettings.current())closeDialog();await syncRoomChanges(uid,{catalog:true});toast('已退出遠征隊。');
 }
-function activitySchedule(room){return activityDate(room.event_date)+(room.event_time?' '+room.event_time+'（'+(room.time_zone==='Asia/Taipei'?'台灣':'日本')+'）':'');}
+function activitySchedule(room){const range=room.event_end_date&&room.event_end_date!==room.event_date;return activityDate(room.event_date,room.event_end_date)+(room.event_time?(range?' · 開始 ':' ')+room.event_time+'（'+(room.time_zone==='Asia/Taipei'?'台灣':'日本')+'）':'');}

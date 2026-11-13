@@ -31,7 +31,7 @@ from .task_feedback import TaskFeedback
 from .squad_invites import SquadInvites
 from .expedition_members import ExpeditionMembers
 from .site_admin import SiteAdmin
-from .expedition_settings import ExpeditionSettings, JoinPassword, room_is_listed
+from .expedition_settings import ExpeditionSettings, JoinPassword, room_is_listed, event_dates
 from .pin_approvals import PinApprovals
 from .blocked_users import BlockedUsers
 
@@ -169,6 +169,8 @@ def init_db():
         columns = {row['name'] for row in c.execute('PRAGMA table_info(expeditions)')}
         if 'discoverable' not in columns:
             c.execute('ALTER TABLE expeditions ADD COLUMN discoverable INTEGER NOT NULL DEFAULT 0')
+        if 'event_end_date' not in columns:
+            c.execute("ALTER TABLE expeditions ADD COLUMN event_end_date TEXT NOT NULL DEFAULT ''")
         c.execute('CREATE INDEX IF NOT EXISTS expeditions_venue_public ON expeditions(venue,discoverable)')
         task_columns = {row['name'] for row in c.execute('PRAGMA table_info(tasks)')}
         if 'location_mode' not in task_columns:
@@ -303,9 +305,10 @@ class ExpeditionInput(Input):
     name: str = Field(min_length=1, max_length=60)
     venue: str
     event_date: date | None = None
+    event_end_date: date | None = None
     discoverable: bool = True
 
-    @field_validator('event_date',mode='before')
+    @field_validator('event_date','event_end_date',mode='before')
     @classmethod
     def empty_date(cls,value):
         return None if isinstance(value,str) and not value.strip() else value
@@ -418,14 +421,15 @@ def create_expedition(body: ExpeditionInput, request: Request):
     u = user(request)
     if body.venue not in {v["id"] for v in ACTIVITY_VENUES}:
         raise HTTPException(422, "請選擇會場。")
-    japan_today = datetime.now(timezone(timedelta(hours=9))).date()
-    if body.event_date is not None and not japan_today-timedelta(days=1) <= body.event_date <= japan_today+timedelta(days=730):
+    event_date, event_end_date = event_dates(body.event_date, body.event_end_date)
+    local_today = datetime.now(timezone(timedelta(hours=8 if body.venue=='taiwan' else 9))).date()
+    if any(day and not local_today-timedelta(days=1) <= day <= local_today+timedelta(days=730) for day in (body.event_date,body.event_end_date)):
         raise HTTPException(422, "活動日期需介於昨天與未來兩年。")
-    room = {"id": secrets.token_hex(12), "code": code(), "name": body.name, "venue": body.venue, "event_date": body.event_date.isoformat() if body.event_date else '', "owner": u["id"], "created": now(), "discoverable":int(body.discoverable)}
+    room = {"id": secrets.token_hex(12), "code": code(), "name": body.name, "venue": body.venue, "event_date": event_date, "event_end_date": event_end_date, "owner": u["id"], "created": now(), "discoverable":int(body.discoverable)}
     with connect() as c:
         if c.execute("SELECT COUNT(*) FROM expeditions WHERE owner=?", (u["id"],)).fetchone()[0] >= 30:
             raise HTTPException(409, "每個使用者最多建立 30 個遠征隊。")
-        c.execute("INSERT INTO expeditions(id,code,name,venue,event_date,owner,created,discoverable) VALUES(:id,:code,:name,:venue,:event_date,:owner,:created,:discoverable)", room)
+        c.execute("INSERT INTO expeditions(id,code,name,venue,event_date,event_end_date,owner,created,discoverable) VALUES(:id,:code,:name,:venue,:event_date,:event_end_date,:owner,:created,:discoverable)", room)
         c.execute("INSERT INTO members(user,expedition,seen) VALUES(?,?,?)", (u["id"], room["id"], now()))
         profiles.joined(c,u['id'],room['id'])
     return room
@@ -435,7 +439,7 @@ def create_expedition(body: ExpeditionInput, request: Request):
 def owned_expeditions(request: Request):
     u=user(request)
     with connect() as c:
-        rooms=[dict(row) for row in c.execute('''SELECT id,name,venue,event_date,owner FROM expeditions
+        rooms=[dict(row) for row in c.execute('''SELECT id,name,venue,event_date,event_end_date,owner FROM expeditions
           WHERE owner=? ORDER BY created DESC,id''',(u['id'],))]
     return {'expeditions':rooms}
 
@@ -471,7 +475,7 @@ def venue_expeditions(vid: str):
     if vid not in {v['id'] for v in ACTIVITY_VENUES}:
         raise HTTPException(404,'找不到這個場館。')
     with connect() as c:
-        rows = c.execute('''SELECT e.id,e.name,e.venue,e.event_date,
+        rows = c.execute('''SELECT e.id,e.name,e.venue,e.event_date,e.event_end_date,
           (SELECT COUNT(*) FROM members m WHERE m.expedition=e.id) AS member_count
           FROM expeditions e WHERE e.venue=? AND e.discoverable=1
           ORDER BY (e.event_date=''),e.event_date,e.created DESC,e.id''',(vid,))
@@ -523,7 +527,7 @@ def preview_expedition(eid: str,request: Request,offset: int=Query(default=0,ge=
     uid=user(request)['id']
     with connect() as c:
         c.execute('BEGIN')
-        room=c.execute('SELECT id,name,owner,venue,discoverable,event_date FROM expeditions WHERE id=?',(eid,)).fetchone()
+        room=c.execute('SELECT id,name,owner,venue,discoverable,event_date,event_end_date FROM expeditions WHERE id=?',(eid,)).fetchone()
         joined=c.execute('SELECT 1 FROM members WHERE expedition=? AND user=?',(eid,uid)).fetchone()
         if not room or not (joined or room['owner']==uid or room_is_listed(c,room)):
             raise HTTPException(404,'找不到可查看成員的遠征隊。')

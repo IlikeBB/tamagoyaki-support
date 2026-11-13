@@ -35,9 +35,11 @@ class Profiles:
               removed INTEGER NOT NULL,PRIMARY KEY(user,expedition)
             );
             ''')
+            if 'event_end_date' not in {row['name'] for row in c.execute('PRAGMA table_info(expedition_records)')}:
+                c.execute("ALTER TABLE expedition_records ADD COLUMN event_end_date TEXT NOT NULL DEFAULT ''")
             c.execute('BEGIN IMMEDIATE')
-            c.execute('''INSERT OR IGNORE INTO expedition_records
-              SELECT id,owner,name,venue,event_date,discoverable FROM expeditions''')
+            c.execute('''INSERT OR IGNORE INTO expedition_records(id,owner,name,venue,event_date,discoverable,event_end_date)
+              SELECT id,owner,name,venue,event_date,discoverable,event_end_date FROM expeditions''')
             legacy=any(row['table']=='expeditions' for row in c.execute('PRAGMA foreign_key_list(expedition_history)'))
             if legacy:c.execute('ALTER TABLE expedition_history RENAME TO expedition_history_legacy')
             c.execute('''CREATE TABLE IF NOT EXISTS expedition_history (
@@ -53,8 +55,8 @@ class Profiles:
 
     @staticmethod
     def archive_room(c,eid):
-        c.execute('''INSERT OR IGNORE INTO expedition_records
-          SELECT id,owner,name,venue,event_date,discoverable FROM expeditions WHERE id=?''',(eid,))
+        c.execute('''INSERT OR IGNORE INTO expedition_records(id,owner,name,venue,event_date,discoverable,event_end_date)
+          SELECT id,owner,name,venue,event_date,discoverable,event_end_date FROM expeditions WHERE id=?''',(eid,))
 
     @staticmethod
     def joined(c,uid,eid):
@@ -86,7 +88,7 @@ class Profiles:
             SELECT 1 FROM members m WHERE m.user=? AND m.expedition=e.id))'''
         params=(uid,uid,viewer,viewer)
         total=c.execute('SELECT COUNT(*) '+clause,params).fetchone()[0]
-        rows=[dict(r) for r in c.execute('''SELECT e.id,e.name,e.venue,e.event_date,
+        rows=[dict(r) for r in c.execute('''SELECT e.id,e.name,e.venue,e.event_date,e.event_end_date,
           NOT EXISTS(SELECT 1 FROM expeditions live WHERE live.id=e.id) AS removed,
           (e.owner=? AND EXISTS(SELECT 1 FROM expeditions live WHERE live.id=e.id)) AS can_delete,
           (?=h.user AND NOT EXISTS(SELECT 1 FROM members m WHERE m.user=h.user AND m.expedition=e.id)) AS can_remove,

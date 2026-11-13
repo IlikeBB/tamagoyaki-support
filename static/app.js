@@ -112,7 +112,7 @@ async function api(path, method='GET', body){
   finally{clearTimeout(timeout);}
 }
 function toast(message){$('#toast').textContent=message;$('#toast').classList.remove('hidden');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').classList.add('hidden'),5000);}
-function activityDate(value){return value||'未指定日期';}
+function activityDate(value,end){return value?(end&&end!==value?value+' ～ '+end:value):'未指定日期';}
 function today(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
 function resetLobby(){
   if(!state.authenticated)assistance?.sync([]);
@@ -451,7 +451,7 @@ function showJoin(mode='browse'){
       try{
         const result=await api(`/venues/${vid}/expeditions`);
         if(current!==generation||!list.isConnected)return;
-        list.innerHTML=result.expeditions.map(room=>`<button class="room-item" data-room-id="${esc(room.id)}"><span><strong>${esc(room.name)}</strong><small>${esc(activityDate(room.event_date))} · ${room.member_count} 位夥伴</small></span><span>${state.rooms.some(r=>r.id===room.id)?'進入':'加入'} ${icon('chevron')}</span></button>`).join('')||empty('這個場館還沒有遠征隊','可以先建立一支，讓同場的夥伴加入。');
+        list.innerHTML=result.expeditions.map(room=>`<button class="room-item" data-room-id="${esc(room.id)}"><span><strong>${esc(room.name)}</strong><small>${esc(activityDate(room.event_date,room.event_end_date))} · ${room.member_count} 位夥伴</small></span><span>${state.rooms.some(r=>r.id===room.id)?'進入':'加入'} ${icon('chevron')}</span></button>`).join('')||empty('這個場館還沒有遠征隊','可以先建立一支，讓同場的夥伴加入。');
         list.onclick=async event=>{
           const button=event.target.closest('[data-room-id]');if(!button||button.disabled)return;
           button.disabled=true;
@@ -463,12 +463,16 @@ function showJoin(mode='browse'){
     $('#join-venue').onchange=event=>{state.activityVenue=event.target.value;switchVenue(event.target.value);loadCatalog(event.target.value);};
     loadCatalog(activityVenue());return;
   }
-  dialog(`${intro}<p class="field-note">以 ${esc(state.user.nickname)} 的身分${mode==='create'?'建立':'加入'}遠征隊。</p><form id="join-form">${mode==='code'?`<label for="code">遠征隊邀請碼</label><input id="code" name="code" required minlength="8" maxlength="8" pattern="[A-Za-z0-9]{8}" autocapitalize="characters" autocomplete="off" value="${esc(params.get('join')||'')}"><label for="expedition-code-password">加入密碼（密碼遠征隊使用）</label><input id="expedition-code-password" name="password" type="password" maxlength="128" autocomplete="off">`:`<label for="name">遠征隊名稱</label><input id="name" name="name" required maxlength="60" placeholder="例如：一起去看 LIVE！"><label for="venue">活動會場</label><select id="venue" name="venue">${options}</select><label class="choice"><input id="include-date" name="include_date" type="checkbox" aria-controls="event-date-fields"><span><strong>添加活動日期</strong><small>可選填，適合已確定場次的遠征隊。</small></span></label><div id="event-date-fields" hidden><label for="event-date">活動日期</label><input id="event-date" name="event_date" type="date" disabled value="${today()}"></div><label class="choice"><input name="discoverable" type="checkbox" checked><span><strong>顯示在這個場館的遠征隊列表</strong><small>其他登入帳號可直接選擇加入；不勾選則只接受邀請碼。</small></span></label>`}<p class="field-note">座標預設不公開。發布任務後，只有該任務的接取者能取得發布者座標；情報點則分享給整隊。</p><div class="form-error" role="alert"></div><button class="button primary full" type="submit">${mode==='code'?'加入遠征隊':'建立遠征隊'} ${icon('arrow')}</button></form>`);
-  if(mode==='create')$('#include-date').onchange=event=>{const enabled=event.target.checked;$('#event-date-fields').hidden=!enabled;$('#event-date').disabled=!enabled;$('#event-date').required=enabled;};
+  dialog(`${intro}<p class="field-note">以 ${esc(state.user.nickname)} 的身分${mode==='create'?'建立':'加入'}遠征隊。</p><form id="join-form">${mode==='code'?`<label for="code">遠征隊邀請碼</label><input id="code" name="code" required minlength="8" maxlength="8" pattern="[A-Za-z0-9]{8}" autocapitalize="characters" autocomplete="off" value="${esc(params.get('join')||'')}"><label for="expedition-code-password">加入密碼（密碼遠征隊使用）</label><input id="expedition-code-password" name="password" type="password" maxlength="128" autocomplete="off">`:`<label for="name">遠征隊名稱</label><input id="name" name="name" required maxlength="60" placeholder="例如：一起去看 LIVE！"><label for="venue">活動會場</label><select id="venue" name="venue">${options}</select><label class="choice"><input id="include-date" name="include_date" type="checkbox" aria-controls="event-date-fields"><span><strong>添加活動日期</strong><small>可選填，適合已確定場次的遠征隊。</small></span></label><div id="event-date-fields" hidden><label for="event-date">開始日期</label><input id="event-date" name="event_date" type="date" disabled value="${today()}"><label for="event-end-date">結束日期（可選）</label><input id="event-end-date" name="event_end_date" type="date" disabled aria-describedby="event-range-note"><p id="event-range-note" class="field-note">單日活動只填開始日期；多日活動再選擇結束日期。</p></div><label class="choice"><input name="discoverable" type="checkbox" checked><span><strong>顯示在這個場館的遠征隊列表</strong><small>其他登入帳號可直接選擇加入；不勾選則只接受邀請碼。</small></span></label>`}<p class="field-note">座標預設不公開。發布任務後，只有該任務的接取者能取得發布者座標；情報點則分享給整隊。</p><div class="form-error" role="alert"></div><button class="button primary full" type="submit">${mode==='code'?'加入遠征隊':'建立遠征隊'} ${icon('arrow')}</button></form>`);
+  if(mode==='create'){
+    const start=$('#event-date'),end=$('#event-end-date');
+    const syncDates=()=>{const enabled=$('#include-date').checked;$('#event-date-fields').hidden=!enabled;start.disabled=!enabled;start.required=enabled;end.disabled=!enabled||!start.value;end.min=start.value;};
+    $('#include-date').onchange=syncDates;start.oninput=syncDates;syncDates();
+  }
   $('#join-form').onsubmit=async event=>{
     event.preventDefault();await submit(event.target,async()=>{
       const f=new FormData(event.target);
-      const room=mode==='code'?await api('/join','POST',{code:f.get('code').toUpperCase(),...(f.get('password')?{password:f.get('password')}:{}),...(squadInvitation?{squad_code:params.get('squad').toUpperCase()}:{})}):await api('/expeditions','POST',{name:f.get('name'),venue:f.get('venue'),event_date:f.has('include_date')?f.get('event_date'):null,discoverable:f.has('discoverable')});
+      const room=mode==='code'?await api('/join','POST',{code:f.get('code').toUpperCase(),...(f.get('password')?{password:f.get('password')}:{}),...(squadInvitation?{squad_code:params.get('squad').toUpperCase()}:{})}):await api('/expeditions','POST',{name:f.get('name'),venue:f.get('venue'),event_date:f.has('include_date')?f.get('event_date'):null,event_end_date:f.has('include_date')?(f.get('event_end_date')||null):null,discoverable:f.has('discoverable')});
       await finishRoomJoin(room,mode==='create');
     });
   };

@@ -11,7 +11,16 @@ def room_is_listed(c, room):
     settings = c.execute('SELECT time_zone FROM expedition_settings WHERE expedition=?', (room['id'],)).fetchone()
     zone = settings['time_zone'] if settings else 'Asia/Taipei' if room['venue']=='taiwan' else 'Asia/Tokyo'
     today = str(datetime.now(timezone(timedelta(hours=8 if zone=='Asia/Taipei' else 9))).date())
-    return not room['event_date'] or room['event_date'] >= today
+    last_day = room['event_end_date'] or room['event_date']
+    return not last_day or last_day >= today
+
+
+def event_dates(start, end):
+    if end and not start:
+        raise HTTPException(422, '請先設定開始日期，再選擇結束日期。')
+    if end and end < start:
+        raise HTTPException(422, '結束日期不能早於開始日期。')
+    return start.isoformat() if start else '', end.isoformat() if end and end != start else ''
 
 
 class JoinPassword(BaseModel):
@@ -22,6 +31,7 @@ class JoinPassword(BaseModel):
 class SettingsInput(BaseModel):
     model_config = ConfigDict(extra='forbid', str_strip_whitespace=True)
     event_date: date | None = None
+    event_end_date: date | None = None
     event_time: str = Field(default='', pattern=r'^(?:[0-2][0-9]:[0-5][0-9])?$')
     time_zone: Literal['Asia/Tokyo', 'Asia/Taipei'] = 'Asia/Tokyo'
     privacy: Literal['public', 'password', 'invite']
@@ -79,7 +89,7 @@ class ExpeditionSettings:
             joined = bool(c.execute('SELECT 1 FROM members WHERE user=? AND expedition=?', (uid, eid)).fetchone())
         settings.pop('expedition', None)
         settings['has_password'] = bool(settings.pop('password_hash'))
-        return {'room': {'id': room['id'], 'name': room['name'], 'event_date': room['event_date']}, 'joined': joined, **settings}
+        return {'room': {key: room[key] for key in ('id', 'name', 'event_date', 'event_end_date')}, 'joined': joined, **settings}
 
     def update(self, eid: str, body: SettingsInput, request: Request):
         uid = self.accounts.current_user(request)['id']
@@ -92,10 +102,16 @@ class ExpeditionSettings:
             c.execute('BEGIN IMMEDIATE')
             self.accounts.require_active(c, uid)
             room = self.leader(c, eid, uid)
-            event_date = body.event_date.isoformat() if body.event_date else ''
+            end = body.event_end_date
+            # Older open clients can still save unrelated settings without dropping a range.
+            if 'event_end_date' not in body.model_fields_set and body.event_date and body.event_date.isoformat() == room['event_date']:
+                end = date.fromisoformat(room['event_end_date']) if room['event_end_date'] else None
+            event_date, event_end_date = event_dates(body.event_date, end)
             today = datetime.now(timezone(timedelta(hours=8 if body.time_zone=='Asia/Taipei' else 9))).date()
             if body.event_date and event_date != room['event_date'] and not today-timedelta(days=1) <= body.event_date <= today+timedelta(days=730):
                 raise HTTPException(422, '活動日期需介於昨天與未來兩年。')
+            if end and event_end_date != room['event_end_date'] and not today-timedelta(days=1) <= end <= today+timedelta(days=730):
+                raise HTTPException(422, '結束日期需介於昨天與未來兩年。')
             if body.event_time and (not event_date or int(body.event_time[:2]) > 23):
                 raise HTTPException(422, '開始時間需搭配活動日期，且使用 00:00–23:59。')
             previous = self.read(c, room)
@@ -107,8 +123,8 @@ class ExpeditionSettings:
               pin_policy=excluded.pin_policy,event_time=excluded.event_time,time_zone=excluded.time_zone''',
               (eid, body.privacy, password_hash, body.pin_policy, body.event_time, body.time_zone))
             discoverable = int(body.privacy != 'invite')
-            c.execute('UPDATE expeditions SET event_date=?,discoverable=? WHERE id=?', (event_date, discoverable, eid))
-            c.execute('UPDATE expedition_records SET event_date=?,discoverable=? WHERE id=?', (event_date, discoverable, eid))
+            c.execute('UPDATE expeditions SET event_date=?,event_end_date=?,discoverable=? WHERE id=?', (event_date, event_end_date, discoverable, eid))
+            c.execute('UPDATE expedition_records SET event_date=?,event_end_date=?,discoverable=? WHERE id=?', (event_date, event_end_date, discoverable, eid))
         return {'ok': True}
 
     def admit(self, c, room, uid, password=None, public=False):
@@ -134,8 +150,8 @@ class ExpeditionSettings:
             if c.execute('SELECT COUNT(*) FROM expeditions WHERE owner=?', (uid,)).fetchone()[0] >= 30:
                 raise HTTPException(409, '每個使用者最多建立 30 個遠征隊。')
             room = {**original, 'id': secrets.token_hex(12), 'code': self.make_code(), 'name': body.name, 'created': int(time.time())}
-            c.execute('''INSERT INTO expeditions(id,code,name,venue,event_date,owner,created,discoverable)
-              VALUES(:id,:code,:name,:venue,:event_date,:owner,:created,:discoverable)''', room)
+            c.execute('''INSERT INTO expeditions(id,code,name,venue,event_date,event_end_date,owner,created,discoverable)
+              VALUES(:id,:code,:name,:venue,:event_date,:event_end_date,:owner,:created,:discoverable)''', room)
             settings = self.read(c, original)
             c.execute('INSERT INTO expedition_settings VALUES(?,?,?,?,?,?)', (room['id'], settings['privacy'], settings['password_hash'], settings['pin_policy'], settings['event_time'], settings['time_zone']))
             c.execute('INSERT INTO members(user,expedition,seen) VALUES(?,?,?)', (uid, room['id'], room['created']))

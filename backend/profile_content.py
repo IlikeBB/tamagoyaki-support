@@ -17,15 +17,16 @@ class ProfileContent:
                 return self.tasks(uid,stamp,offset)
             category="p.kind='message'" if kind=='message' else "p.kind<>'message'"
             selection='''SELECT p.id,'pin' AS source,p.id AS parent_pin,p.expedition,p.title,p.description,p.kind,p.created,p.expires,
-              e.name AS room_name,e.venue,e.event_date,0 AS parent_removed,
+              e.name AS room_name,e.venue,e.event_date,e.event_end_date,0 AS parent_removed,
               EXISTS(SELECT 1 FROM members m WHERE m.user=? AND m.expedition=p.expedition) AS participating
               FROM pins p JOIN expeditions e ON e.id=p.expedition WHERE p.owner=? AND '''+category
             params=[uid,uid]
             if kind=='message':
                 selection+=''' UNION ALL SELECT r.id,'report' AS source,r.pin AS parent_pin,a.expedition,a.title,r.body AS description,
-                  'report' AS kind,r.created,p.expires,a.room_name,a.venue,a.event_date,p.id IS NULL AS parent_removed,
+                  'report' AS kind,r.created,p.expires,a.room_name,a.venue,COALESCE(e.event_date,a.event_date) AS event_date,COALESCE(e.event_end_date,'') AS event_end_date,p.id IS NULL AS parent_removed,
                   EXISTS(SELECT 1 FROM members m WHERE m.user=? AND m.expedition=a.expedition) AS participating
-                  FROM landmark_reports r JOIN landmark_records a ON a.pin=r.pin LEFT JOIN pins p ON p.id=r.pin WHERE r.owner=?'''
+                  FROM landmark_reports r JOIN landmark_records a ON a.pin=r.pin LEFT JOIN pins p ON p.id=r.pin
+                  LEFT JOIN expedition_records e ON e.id=a.expedition WHERE r.owner=?'''
                 params.extend((uid,uid))
             with self.connect() as c:
                 c.execute('BEGIN')
@@ -64,7 +65,7 @@ class ProfileContent:
             c.execute('BEGIN')
             total=c.execute('SELECT COUNT(*) '+selection,(uid,stamp)).fetchone()[0]
             items=[dict(row) for row in c.execute('''SELECT t.id,'task' AS source,t.expedition,t.title,t.description,
-              t.kind,t.status,t.created,t.expires,t.help_active,e.name AS room_name,e.venue,e.event_date,
+              t.kind,t.status,t.created,t.expires,t.help_active,e.name AS room_name,e.venue,e.event_date,e.event_end_date,
               EXISTS(SELECT 1 FROM members m WHERE m.user=? AND m.expedition=t.expedition) AS can_view
               '''+selection+' ORDER BY t.created DESC,t.id DESC LIMIT 12 OFFSET ?',(uid,uid,stamp,offset))]
             for item in items:

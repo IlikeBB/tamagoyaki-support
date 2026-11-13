@@ -72,7 +72,7 @@ class WallHistoryTest(test_app.RendezvousTest):
         with self.module.connect() as db:
             for index in range(14):
                 eid='archived-'+self.room['id']+'-'+str(index)
-                db.execute('INSERT INTO expedition_records VALUES(?,?,?,?,?,?)',(eid,self.users[0]['id'],'歷史場次 '+str(index),'taiwan','',1))
+                db.execute('INSERT INTO expedition_records(id,owner,name,venue,event_date,discoverable) VALUES(?,?,?,?,?,?)',(eid,self.users[0]['id'],'歷史場次 '+str(index),'taiwan','',1))
                 db.execute('INSERT INTO expedition_history VALUES(?,?,?,?)',(self.users[1]['id'],eid,index,index))
         before=self.wall(self.b);self.assertEqual(before['total'],15);self.assertEqual(len(before['items']),12)
         past=next(item for item in before['items'] if item['can_remove'])

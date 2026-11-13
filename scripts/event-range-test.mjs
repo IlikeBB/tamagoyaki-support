@@ -1,0 +1,36 @@
+import {chromium,expect} from '@playwright/test';
+import {randomBytes} from 'node:crypto';
+const origin='http://127.0.0.1:8079';if(process.env.QA_ORIGIN!==origin)throw Error('Use isolated QA port 8079.');
+const browser=await chromium.launch({headless:true,executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'}),errors=[],checks=[];
+async function api(page,path,method='GET',data){const r=await page.request.fetch(origin+'/api'+path,{method,data,headers:{'X-Tamago-Client':'web',Origin:origin}});expect(r.ok(),`${path}: ${r.status()}`).toBe(true);return r.json();}
+try{
+ const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true});page.setDefaultTimeout(15000);page.on('pageerror',e=>errors.push(e.message));
+ await api(page,'/auth/register','POST',{username:'range_'+randomBytes(6).toString('hex'),nickname:'多日遠征者',password:'Isolated date range passphrase 2026!'});
+ await page.goto(origin+'/#expeditions');await expect.poll(()=>page.evaluate(()=>state.authenticated&&!!map),{timeout:25000}).toBe(true);await page.evaluate(()=>clearInterval(pollTimer));
+ const start=await page.evaluate(()=>today()),plus=days=>new Date(Date.parse(start+'T12:00:00Z')+days*86400000).toISOString().slice(0,10),end=plus(3);
+ await page.locator('[data-expedition-create]').click();await page.locator('#name').fill('四日同行遠征');await page.locator('#venue').selectOption('taiwan');
+ await expect(page.locator('#event-date-fields')).toBeHidden();await expect(page.locator('#event-end-date')).toBeDisabled();await page.locator('#include-date').check();await expect(page.locator('#event-date')).toHaveAttribute('required','');
+ await page.locator('#event-date').fill(start);await page.locator('#event-end-date').fill(plus(-1));expect(await page.locator('#event-end-date').evaluate(input=>input.validity.rangeUnderflow)).toBe(true);await page.locator('#event-end-date').fill(end);
+ await page.locator('#include-date').uncheck();await expect(page.locator('#event-date')).toBeDisabled();await expect(page.locator('#event-end-date')).toBeDisabled();await page.locator('#include-date').check();await expect(page.locator('#event-end-date')).toHaveValue(end);
+ for(const dark of [false,true]){await page.evaluate(value=>TamagoTheme.set(value),dark);for(const width of [320,390,768,1024,1440]){await page.setViewportSize({width,height:900});expect(await page.locator('#dialog').evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);if(width===390)await page.screenshot({path:`artifacts/event-range-create-${dark?'dark':'light'}-390.png`,animations:'disabled'});}}
+ await page.setViewportSize({width:390,height:844});await page.locator('#join-form [type=submit]').click();await expect(page.locator('#dialog')).toBeHidden();await expect(page.locator('#room-date')).toHaveText(`${start} ～ ${end} · 台灣`);
+ const room=await page.evaluate(()=>state.room),path='/expeditions/'+room.id;expect(room.event_end_date).toBe(end);
+ await page.locator('.mobile-tabs [data-action=expeditions]').click();await page.locator('[data-expedition-mode=joined]').click();await expect(page.locator('[data-expedition-mine-list] .expedition-entry').filter({hasText:room.name})).toContainText(`${start} ～ ${end}`);
+ await page.locator('[data-expedition-search]').fill(end);await expect(page.locator('[data-expedition-mine-list] .expedition-entry')).toHaveCount(1);await page.locator('[data-expedition-search]').fill('');
+ await page.locator(`[data-expedition-manage="${room.id}"]`).click();await expect(page.locator('#room-event-end-date')).toHaveValue(end);
+ const section=kind=>page.locator(`[data-room-form=${kind}]`),open=kind=>section(kind).locator('..').locator('summary').click();
+ await open('time');await page.locator('#room-event-end-date').fill(plus(4));await page.locator('#room-event-time').fill('18:30');await section('time').locator('[type=submit]').click();await expect(section('time').locator('..')).not.toHaveAttribute('open','');expect((await api(page,path+'/settings')).room.event_end_date).toBe(plus(4));
+ // Saving another accordion must preserve the range.
+ await open('pins');await page.locator('#room-pin-policy').selectOption('approval');await section('pins').locator('[type=submit]').click();await expect(section('pins').locator('..')).not.toHaveAttribute('open','');expect((await api(page,path+'/settings')).room.event_end_date).toBe(plus(4));
+ await open('time');await expect(page.locator('#room-event-end-date')).toHaveValue(plus(4));await page.locator('#room-event-end-date').fill('');await section('time').locator('[type=submit]').click();await expect(section('time').locator('..')).not.toHaveAttribute('open','');expect((await api(page,path+'/settings')).room.event_end_date).toBe('');
+ await open('time');await page.locator('#room-event-end-date').fill(end);await section('time').locator('[type=submit]').click();await expect(section('time').locator('..')).not.toHaveAttribute('open','');
+ await open('copy');await page.locator('#room-copy-name').fill('四日同行複本');await section('copy').locator('[type=submit]').click();await expect(page.locator('#dialog')).toBeHidden();
+ const copied=(await api(page,'/me')).expeditions.find(item=>item.name==='四日同行複本');expect(copied.event_end_date).toBe(end);await expect(page.locator('[data-expedition-mine-list] .expedition-entry').filter({has:page.locator(`[data-expedition-enter="${room.id}"]`)})).toContainText('開始 18:30');
+ checks.push('creates date ranges, rejects reversed dates in the form, displays/searches the range, edits dates, keeps them when saving other settings and copies them');
+ await page.locator('#account-button').click();await expect(page.locator('.profile-wall-card').filter({hasText:room.name})).toContainText(`${start} ～ ${end}`);await page.locator('#profile-close').click();
+ await page.locator('[data-expedition-mode=browse]').click();await page.locator('#expedition-page-venue').selectOption('taiwan');await expect(page.locator('[data-expedition-catalog-list] .expedition-entry').filter({has:page.locator(`[data-expedition-enter="${room.id}"]`)})).toContainText(`${start} ～ ${end}`);
+ await page.locator('[data-expedition-create]').click();await page.locator('#name').fill('只去一天');await page.locator('#include-date').check();await page.locator('#event-date').fill(start);await page.locator('#join-form [type=submit]').click();await expect(page.locator('#dialog')).toBeHidden();await expect(page.locator('#room-date')).toHaveText(`${start} · 台灣`);
+ await page.locator('.mobile-tabs [data-action=expeditions]').click();await page.locator('[data-expedition-create]').click();await page.locator('#name').fill('日期還沒決定');await page.locator('#include-date').check();await page.locator('#event-end-date').fill(end);await page.locator('#include-date').uncheck();await page.locator('#join-form [type=submit]').click();await expect(page.locator('#dialog')).toBeHidden();expect(await page.evaluate(()=>[state.room.event_date,state.room.event_end_date])).toEqual(['','']);
+ checks.push('profile wall and public list display the full range; single-day and optional undated creation still work; light/dark create forms fit 320–1440px');
+ expect(errors).toEqual([]);console.log(JSON.stringify({ok:true,checks,errors}));
+}finally{await browser.close();}
