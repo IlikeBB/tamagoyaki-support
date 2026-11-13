@@ -29,6 +29,8 @@ from .profile_content import ProfileContent
 from .landmark_reports import LandmarkReports
 from .task_feedback import TaskFeedback
 from .squad_invites import SquadInvites
+from .expedition_members import ExpeditionMembers
+from .site_admin import SiteAdmin
 
 ROOT = Path(__file__).resolve().parents[1]
 DB = Path(os.environ.get("TAMAGO_DB", str(ROOT / "data" / "tamagoyaki.sqlite3")))
@@ -110,6 +112,9 @@ def prune_empty_squads(c, eid=None):
     c.execute(f'DELETE FROM squads WHERE id IN ({empty})',(eid,eid))
 
 
+expedition_members = ExpeditionMembers(connect, accounts, profile_media, task_feedback, assistance, prune_empty_squads)
+
+
 def init_db():
     DB.parent.mkdir(parents=True, exist_ok=True)
     with connect() as c:
@@ -153,6 +158,7 @@ def init_db():
         CREATE INDEX IF NOT EXISTS members_squad ON members(squad);
         """)
     accounts.migrate()
+    expedition_members.migrate()
     friends.migrate()
     with connect() as c:
         columns = {row['name'] for row in c.execute('PRAGMA table_info(expeditions)')}
@@ -202,6 +208,8 @@ async def lifespan(app):
 
 
 app = FastAPI(title="玉子燒支援隊", lifespan=lifespan, docs_url=None, redoc_url=None)
+app.include_router(expedition_members.router)
+app.include_router(SiteAdmin(connect, accounts).router)
 accounts.install(app)
 friends.install(app)
 assistance.install(app)
@@ -379,7 +387,7 @@ def me(request: Request):
     except HTTPException:
         return {"user": None, "expeditions": []}
     with connect() as c:
-        rooms = [dict(r) for r in c.execute("SELECT e.* FROM expeditions e JOIN members m ON m.expedition=e.id WHERE m.user=? ORDER BY e.created DESC", (u["id"],))]
+        rooms = [dict(r) for r in c.execute("SELECT e.*,CASE WHEN e.owner=m.user THEN 'leader' WHEN m.deputy=1 THEN 'deputy' ELSE 'member' END AS my_role FROM expeditions e JOIN members m ON m.expedition=e.id WHERE m.user=? ORDER BY e.created DESC", (u["id"],))]
         help_rooms=assistance.rooms(c,u['id'])
         account = {**accounts.public(u), **profiles.public(c,u['id'])}
     return {"user": account, "expeditions": rooms, "help_rooms":help_rooms}
@@ -494,6 +502,23 @@ def join(body: ExpeditionJoin, request: Request):
     return {**dict(room),**({'squad_joined':True} if squad else {})}
 
 
+@app.get('/api/expeditions/{eid}/preview')
+def preview_expedition(eid: str,request: Request,offset: int=Query(default=0,ge=0,le=1000000)):
+    uid=user(request)['id']
+    today=str(datetime.now(timezone(timedelta(hours=9))).date())
+    with connect() as c:
+        c.execute('BEGIN')
+        room=c.execute('SELECT id,name,owner,discoverable,event_date FROM expeditions WHERE id=?',(eid,)).fetchone()
+        joined=c.execute('SELECT 1 FROM members WHERE expedition=? AND user=?',(eid,uid)).fetchone()
+        if not room or not (joined or room['owner']==uid or room['discoverable'] and (not room['event_date'] or room['event_date']>=today)):
+            raise HTTPException(404,'找不到可查看成員的遠征隊。')
+        total=c.execute('SELECT COUNT(*) FROM members WHERE expedition=?',(eid,)).fetchone()[0]
+        rows=c.execute('''SELECT m.user,u.nickname FROM members m JOIN users u ON u.id=m.user
+          WHERE m.expedition=? ORDER BY m.user LIMIT 50 OFFSET ?''',(eid,offset)).fetchall()
+        items=[{'id':row['user'],'nickname':row['nickname'],'avatar_url':profile_media.urls(c,row['user'])['avatar_url']} for row in rows]
+    return {'room':{'id':room['id'],'name':room['name']},'items':items,'total':total,'next_offset':offset+len(items) if offset+len(items)<total else None}
+
+
 @app.get("/api/expeditions/{eid}")
 def snapshot(eid: str, request: Request):
     u, mine = member(request, eid)
@@ -530,12 +555,12 @@ def snapshot(eid: str, request: Request):
             if p['user'] != u['id'] and not visible:
                 p['scope'] = 'off'
             p['location_status'] = ('live' if p['located'] >= stamp-LIVE_SECONDS else 'last_known') if visible else None
+            if p['squad']!=mine['squad']:
+                p['squad']=None
             members.append(p)
         squads = []
-        for row in c.execute("SELECT * FROM squads WHERE expedition=?", (eid,)):
+        for row in c.execute("SELECT * FROM squads WHERE expedition=? AND id=?", (eid,mine['squad'])):
             squad = dict(row)
-            if squad["id"] != mine["squad"]:
-                squad.pop("code")
             squads.append(squad)
         tasks = []
         for row in c.execute("SELECT t.*,u.nickname AS owner_name,a.nickname AS assignee_name FROM tasks t JOIN users u ON u.id=t.owner LEFT JOIN users a ON a.id=t.assignee WHERE t.expedition=? AND (t.expires>? OR (t.help_active=1 AND t.status IN ('open','accepted'))) ORDER BY t.created DESC", (eid,stamp)):
@@ -623,6 +648,7 @@ def locate(eid: str, body: Location, request: Request):
     u, m = member(request,eid)
     with connect() as c:
         c.execute('BEGIN IMMEDIATE')
+        accounts.require_active(c,u['id'])
         if body.scope=='expedition':
             raise HTTPException(409,'一般定位已改為好友與小隊分享，請重新開啟定位設定。')
         # Recheck membership inside the write transaction, including concurrent exits.
@@ -647,6 +673,7 @@ def share_with_friends_and_squad(body: SharedLocation,request: Request):
     uid=user(request)['id']
     with connect() as c:
         c.execute('BEGIN IMMEDIATE')
+        accounts.require_active(c,uid)
         if assistance.required(c,uid):
             raise HTTPException(409,'求助期間須維持求助定位；請先刪除求助任務。')
         if bool(body.expedition_id)!=bool(body.squad_id):

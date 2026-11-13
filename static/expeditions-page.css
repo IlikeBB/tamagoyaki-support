@@ -1,0 +1,28 @@
+.expeditions-page[hidden]{display:none!important}
+.expeditions-page{flex:1 1 0;min-height:0;overflow:auto;overscroll-behavior:contain;background:var(--paper);padding:24px max(24px,env(safe-area-inset-right,0px)) 40px max(24px,env(safe-area-inset-left,0px))}
+body.expeditions-open .workspace,body.expeditions-open>.finder-launcher,body.expeditions-open>.finder-window{display:none!important}
+.expeditions-layout{width:100%;max-width:1040px;margin:auto}
+.expeditions-heading{display:flex;justify-content:space-between;align-items:center;gap:24px;padding-bottom:24px;border-bottom:1px solid var(--line)}
+.expeditions-back{display:inline-flex;align-items:center;gap:8px;min-height:44px;color:var(--muted);padding:0;font-size:12px}
+.expeditions-back svg{width:16px;height:16px}.expeditions-heading h1{font-size:28px;line-height:1.4;margin:8px 0 0;letter-spacing:.5px}
+.expeditions-actions{display:flex;flex-wrap:wrap;gap:8px}.expeditions-actions .button{min-height:44px}
+.expeditions-tools{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;margin:24px 0}
+.expeditions-modes{display:flex;gap:4px;padding:4px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.expeditions-modes button{min-height:44px;padding:8px 16px;border-radius:4px;color:var(--muted);font-size:13px;font-weight:600}
+.expeditions-modes button[aria-pressed=true]{color:var(--green);background:var(--green-soft)}.expeditions-modes span:not(:empty){font-size:11px;margin-left:4px}
+.expeditions-search{display:flex;align-items:center;gap:8px;margin:0;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);width:320px;max-width:100%;min-height:44px;color:var(--muted)}
+.expeditions-search svg{width:18px;height:18px}.expeditions-search input{min-width:0;flex:1;border:0;background:transparent!important;color:var(--ink);font-size:16px;outline-offset:6px}
+.expeditions-page [data-expedition-section][hidden]{display:none}.expeditions-section-heading{display:flex;justify-content:space-between;align-items:center;gap:16px}
+.expeditions-section-heading h2{font-size:16px;margin:0}.expeditions-section-heading button{min-height:44px;padding:8px 0 8px 12px;color:var(--green);font-size:12px}
+.expeditions-page select{max-width:400px;font-size:16px;min-height:44px}.expeditions-status{font-size:12px;color:var(--muted);margin:8px 0;min-height:0}.expeditions-status:empty{margin:0}
+.expedition-entry{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:20px 0;border-bottom:1px solid var(--line)}
+.expedition-entry-copy{flex:1;min-width:0}.expedition-entry-name{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.expedition-entry h3{font-size:16px;line-height:1.6;margin:0;overflow-wrap:anywhere}.expedition-entry p{font-size:12px;color:var(--muted);margin:4px 0 0;overflow-wrap:anywhere}.expedition-entry small{font-size:11px;color:var(--green)}
+.expedition-current{font-size:10px;white-space:nowrap;padding:2px 8px;background:var(--green-soft);color:var(--green);border-radius:4px}.expedition-entry>.button{min-height:44px;font-size:12px;flex:none}
+.expedition-entry-actions{display:flex;flex-wrap:wrap;gap:16px;flex-basis:100%;margin-top:0}.expedition-entry-actions button{min-height:44px;font-size:12px;color:var(--green);padding:8px 0}.expedition-entry-actions [data-action=leave]{color:var(--orange)}
+.expeditions-empty{padding:32px 0;color:var(--muted);font-size:13px}.expeditions-empty strong{color:var(--ink);font-size:15px}.expeditions-empty p{margin:8px 0 0;line-height:1.8}
+.expeditions-manage{display:inline-flex;gap:8px;align-items:center;min-height:44px;margin-top:16px;padding:8px 0;color:var(--green);font-size:12px}.expeditions-manage[hidden]{display:none}
+.expeditions-skeleton{height:112px;margin:12px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--green-soft)}
+@media(max-width:700px){.expeditions-page{padding:16px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}.expeditions-heading{align-items:flex-start;flex-direction:column;gap:16px;padding-bottom:20px}.expeditions-heading h1{font-size:24px;margin-top:4px}.expeditions-actions{width:100%}.expeditions-actions .button{flex:1;font-size:12px;padding:10px 12px}.expeditions-tools{gap:12px;margin:20px 0}.expeditions-modes{width:100%}.expeditions-modes button{flex:1;font-size:12px;padding:8px}.expeditions-search{width:100%}.expedition-entry{gap:12px;padding:16px 0}.expedition-entry h3{font-size:14px}.expedition-entry>.button{padding:8px 12px;font-size:11px}.expedition-entry p{font-size:11px}}
+
+.sidebar-room-context[hidden]{display:none!important}
+@media(max-width:700px){.sidebar.without-room-context .side-divider{display:none}}

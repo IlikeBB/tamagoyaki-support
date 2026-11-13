@@ -62,7 +62,7 @@ class Accounts:
     def migrate(self):
         with self.connect() as c:
             columns = {row["name"] for row in c.execute("PRAGMA table_info(users)")}
-            for name, kind in (("username", "TEXT"), ("password_hash", "TEXT"), ("registered", "INTEGER")):
+            for name, kind in (("username", "TEXT"), ("password_hash", "TEXT"), ("registered", "INTEGER"), ("suspended", "INTEGER NOT NULL DEFAULT 0 CHECK(suspended IN (0,1))")):
                 if name not in columns:
                     c.execute(f"ALTER TABLE users ADD COLUMN {name} {kind}")
             c.executescript("""
@@ -75,16 +75,27 @@ class Accounts:
             CREATE TABLE IF NOT EXISTS auth_attempts (
               key TEXT PRIMARY KEY, window INTEGER NOT NULL, attempts INTEGER NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS site_admin_owner (
+              singleton INTEGER PRIMARY KEY CHECK(singleton=1),
+              user TEXT UNIQUE NOT NULL REFERENCES users(id)
+            );
             """)
+            c.execute("INSERT OR IGNORE INTO site_admin_owner(singleton,user) SELECT 1,id FROM users WHERE username='momo' COLLATE NOCASE")
+
+    def public(self, u):
+        with self.connect() as c:
+            admin = bool(c.execute('SELECT 1 FROM site_admin_owner WHERE user=?', (u['id'],)).fetchone())
+        return {"id": u["id"], "username": u["username"], "nickname": u["nickname"], "site_admin": admin}
 
     @staticmethod
-    def public(u):
-        return {"id": u["id"], "username": u["username"], "nickname": u["nickname"]}
+    def require_active(c, uid):
+        if not c.execute('SELECT 1 FROM users WHERE id=? AND suspended=0', (uid,)).fetchone():
+            raise HTTPException(401, '此帳號已停用，請聯絡管理員。')
 
     def current_user(self, request):
         token = request.cookies.get("tamago_session", "")
         with self.connect() as c:
-            row = c.execute("SELECT u.* FROM sessions s JOIN users u ON u.id=s.user WHERE s.token_hash=? AND s.expires>? AND u.username IS NOT NULL", (token_hash(token), int(time.time()))).fetchone()
+            row = c.execute("SELECT u.* FROM sessions s JOIN users u ON u.id=s.user WHERE s.token_hash=? AND s.expires>? AND u.username IS NOT NULL AND u.suspended=0", (token_hash(token), int(time.time()))).fetchone()
         if row is None:
             raise HTTPException(401, "請先登入帳號。")
         return dict(row)
@@ -121,6 +132,7 @@ class Accounts:
             self.hash_slots.release()
 
     def issue(self, c, user_id, response, previous_token=""):
+        self.require_active(c, user_id)
         stamp = int(time.time())
         c.execute("DELETE FROM sessions WHERE token_hash=? OR expires<=?", (token_hash(previous_token),stamp))
         token = secrets.token_urlsafe(32)
@@ -168,6 +180,7 @@ class Accounts:
             replacement = self.hash_password(body.password.get_secret_value()) if self.hasher.check_needs_rehash(encoded) else encoded
             with self.connect() as c:
                 c.execute("BEGIN IMMEDIATE")
+                self.require_active(c, row['id'])
                 # Reject a concurrent password change that happened during verification.
                 current = c.execute("SELECT password_hash FROM users WHERE id=?",(row["id"],)).fetchone()
                 if current["password_hash"] != encoded:

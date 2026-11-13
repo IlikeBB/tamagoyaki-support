@@ -30,6 +30,7 @@ class RendezvousTest(unittest.TestCase):
         cls.temp.cleanup()
 
     def setUp(self):
+        self.module.limits.clear()
         with self.module.connect() as db:
             db.execute("DELETE FROM auth_attempts")
         self.clients = [TestClient(self.module.app, headers={"X-Tamago-Client":"web"}) for _ in range(4)]
@@ -132,8 +133,7 @@ class RendezvousTest(unittest.TestCase):
         self.a.post('/api/friends/requests',json={'username':self.usernames[1]})
         self.b.post('/api/friends/'+self.users[0]['id']+'/accept')
         squad=self.a.post(self.path+"/squads",json={"name":"同行小隊"}).json()
-        other_squad=self.snapshot(self.c)["squads"][0]
-        self.assertNotIn("code",other_squad)
+        self.assertEqual(self.snapshot(self.c)["squads"],[])
         self.assertEqual(self.b.post(self.path+"/squads/join",json={"code":squad["code"]}).status_code,200)
         task=self.make_task()
         task_path=self.path+'/tasks/'+task['id']

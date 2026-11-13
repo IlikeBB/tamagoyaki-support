@@ -1,0 +1,14 @@
+.expedition-managed-person{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+.expedition-managed-person .expedition-preview-person{min-width:0;border:0;padding:8px 0;gap:8px}
+.expedition-managed-person .expedition-preview-person strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.expedition-managed-person .expedition-preview-avatar{width:32px;height:32px}
+.expedition-managed-person strong small{display:block;color:var(--muted);font-size:11px;font-weight:400;margin-top:4px}
+.expedition-member-actions{display:flex;flex-wrap:nowrap;gap:8px;justify-content:flex-end}
+.expedition-member-actions button,[data-member-more]{min-height:44px;padding:8px 12px;font-size:12px;color:var(--green);border:1px solid var(--line);border-radius:8px}
+.expedition-member-actions [data-member-kick]{color:var(--orange)}
+.expedition-member-actions button{font-size:11px;padding:8px}
+.expedition-member-confirm{grid-column:1/-1;background:var(--green-soft);padding:12px;margin:8px 0;border-radius:8px}
+.expedition-member-confirm p{color:var(--ink);font-size:12px;overflow-wrap:anywhere;margin:0 0 12px}
+.expedition-member-confirm button{min-height:44px;margin:0 8px 0 0;font-size:12px}
+[data-member-more]{display:block;margin:12px auto}[data-member-more][hidden]{display:none}
+#owned-rooms .owned-room{flex-wrap:wrap}

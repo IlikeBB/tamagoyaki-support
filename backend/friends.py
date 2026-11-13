@@ -98,6 +98,7 @@ class Friends:
             uid = self.accounts.current_user(request)['id']
             with self.connect() as c:
                 c.execute('BEGIN IMMEDIATE')
+                self.accounts.require_active(c,uid)
                 if self.help_required and self.help_required(c,uid):
                     raise HTTPException(409,'求助期間須持續分享給求助所在遠征隊；請先刪除求助任務。')
                 c.execute("UPDATE members SET scope='off',lat=NULL,lng=NULL,accuracy=NULL,located=NULL WHERE user=?",(uid,))

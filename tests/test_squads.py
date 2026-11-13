@@ -18,7 +18,7 @@ class SquadsTest(test_app.RendezvousTest):
         first=self.create(self.a,'南口小隊')
         self.assertEqual(self.b.post(self.path+'/squads/join',json={'code':first['code'].lower()}).status_code,200)
         self.assertEqual(self.snapshot(self.a)['me']['squad'],first['id'])
-        self.assertNotIn('code',self.snapshot(self.c)['squads'][0])
+        self.assertEqual(self.snapshot(self.c)['squads'],[])
         self.assertEqual(self.snapshot(self.b)['squads'][0]['code'],first['code'])
         second=self.create(self.a,'物販小隊')
         self.assertEqual(self.snapshot(self.a)['me']['squad'],second['id'])
@@ -68,7 +68,7 @@ class SquadsTest(test_app.RendezvousTest):
         self.b.post(self.path+'/squads/join',json={'code':squad['code']})
         leave=self.path+'/squads/'+squad['id']+'/membership'
         self.assertEqual(self.a.delete(leave).status_code,200)
-        self.assertEqual([s['id'] for s in self.snapshot(self.c)['squads']],[squad['id']])
+        self.assertEqual([s['id'] for s in self.snapshot(self.b)['squads']],[squad['id']])
         self.assertEqual(self.b.delete(leave).status_code,200)
         self.assertEqual(self.snapshot(self.c)['squads'],[])
         self.assertEqual(self.c.post(self.path+'/squads/join',json={'code':squad['code']}).status_code,404)
@@ -82,7 +82,7 @@ class SquadsTest(test_app.RendezvousTest):
         self.assertEqual(self.b.post(self.path+'/squads/join',json={'code':first['code']}).status_code,404)
         other=self.create(self.b,'另一隊')
         self.assertEqual(self.a.post(self.path+'/squads/join',json={'code':other['code']}).status_code,200)
-        self.assertEqual([s['id'] for s in self.snapshot(self.c)['squads']],[other['id']])
+        self.assertEqual([s['id'] for s in self.snapshot(self.b)['squads']],[other['id']])
         self.assertEqual(self.a.delete(self.path+'/membership').status_code,200)
         self.assertEqual([s['id'] for s in self.snapshot(self.b)['squads']],[other['id']])
         self.assertEqual(self.b.delete(self.path+'/membership').status_code,200)
@@ -114,6 +114,23 @@ class SquadsTest(test_app.RendezvousTest):
         self.assertEqual(data['me']['squad'],squad['id'] if joined==200 else None)
         with self.module.connect() as db:
             self.assertEqual(db.execute('PRAGMA foreign_key_check').fetchall(),[])
+
+    def test_squad_rosters_and_grouping_are_private_to_current_squad(self):
+        alpha=self.create(self.a,'僅限目前小隊')
+        self.b.post(self.path+'/squads/join',json={'code':alpha['code']})
+        beta=self.create(self.c,'另一個隱蔽小隊')
+        self.outsider.post('/api/join',json={'code':self.room['code']})
+        a=self.snapshot(self.a);c=self.snapshot(self.c);outsider=self.snapshot(self.outsider)
+        self.assertEqual([row['id'] for row in a['squads']],[alpha['id']])
+        self.assertEqual([row['id'] for row in c['squads']],[beta['id']])
+        self.assertEqual(outsider['squads'],[])
+        self.assertEqual({row['squad'] for row in outsider['members']},{None})
+        self.assertIsNone(next(row for row in a['members'] if row['user']==self.users[2]['id'])['squad'])
+        self.assertTrue(all(row['squad'] is None for row in c['members'] if row['user']!=self.users[2]['id']))
+        self.assertEqual(sum(row['squad']==alpha['id'] for row in a['members']),2)
+        preview=self.outsider.get(self.path+'/preview').json()
+        self.assertEqual(preview['total'],4)
+        self.assertTrue(all(set(row)=={'id','nickname','avatar_url'} for row in preview['items']))
 
 
 for name in list(vars(test_app.RendezvousTest)):

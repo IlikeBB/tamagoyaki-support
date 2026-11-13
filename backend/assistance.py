@@ -52,6 +52,7 @@ class Assistance:
             uid=self.accounts.current_user(request)['id'];stamp=int(time.time())
             with self.connect() as c:
                 c.execute('BEGIN IMMEDIATE')
+                self.accounts.require_active(c,uid)
                 rooms=self.rooms(c,uid)
                 if not rooms:raise HTTPException(409,'目前沒有持續中的求助任務。')
                 self.prune(c,uid)

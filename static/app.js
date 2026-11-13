@@ -45,7 +45,7 @@ let placeSearch=null;
 let assistance=null;
 let appDisplay=null;
 let chat=null,squadInvites=null;
-let landmarkReports=null,pinFilters=null;
+let landmarkReports=null,pinFilters=null,expeditionPage=null,expeditionPreview=null,expeditionManagement=null,siteAccountAdmin=null;
 let profilePage=null,landmarkFeedback=null,taskFeedback=null,news=null,chatFriend=null,groundMessages=null;
 let locationCardDismissed=false;
 let centerOnLocationFix=true;
@@ -195,13 +195,13 @@ function marker(point,html,label,onClick){
   return m;
 }
 function renderMap(){
-  if(!map)return;
+  if(!map||document.body.classList.contains('expeditions-open'))return;
   const allowed=new Set(finderTasks().map(t=>t.id));
   const sharedPoints=sharedPeople();
   const sharedOwners=new Set(sharedPoints.map(p=>p.owner)),helpOwners=new Set();
   visibleTeammateKey=guidanceKey();
   layers.clearLayers();
-  config.venues.filter(validMapPoint).forEach(v=>marker(v,`<div class="venue-map-point ${v.id===state.activeVenue?'is-current':''}"><div class="map-pin venue">${icon('ticket')}</div><span>${esc(v.short)}</span></div>`,`${v.name} · 固定地標`,()=>switchVenue(v.id)));
+  if(!pinFilters||pinFilters.venuesVisible())config.venues.filter(validMapPoint).forEach(v=>marker(v,`<div class="venue-map-point ${v.id===state.activeVenue?'is-current':''}"><div class="map-pin venue">${icon('ticket')}</div><span>${esc(v.short)}</span></div>`,`${v.name} · 固定地標`,()=>switchVenue(v.id)));
   if(placeSearch?.selected&&validMapPoint(placeSearch.selected))marker(placeSearch.selected,`<div class="map-pin blue search-result-marker">${icon('search')}</div>`,`${placeSearch.selected.name} · 搜尋結果`,()=>placeSearch.showSelected());
   state.pins.filter(validMapPoint).filter(p=>!pinFilters||pinFilters.matches(p)).forEach(p=>{
     const html=p.kind==='message'?`<div class="ground-message-marker"><span>${icon('message')}</span><small>留言</small></div>`:`<div class="map-pin blue">${icon(p.kind==='shop'?'shop':'pin')}</div>`;
@@ -223,7 +223,7 @@ function renderMap(){
     marker(state.position,MapPresence.render({kind:'self',angle:stale?null:state.heading,lastKnown:stale,label:`你 · ${stale?`最後位置 · ${LocationState.age(lastPositionAt/1000)}`:accuracy}`}),'我的位置');
     MapPresence.updateSelf($('#map .self-map-point'),stale?null:state.heading);
   }
-  pinFilters?.update(state.pins.filter(validMapPoint));renderRadar();renderTarget();
+  pinFilters?.update(state.pins.filter(validMapPoint),config.venues.filter(validMapPoint).length);renderRadar();renderTarget();
 }
 function personMarker(t){
   if(t.help_shared||t.help_active)return marker(t,`<div class="help-map-marker" aria-hidden="true">!</div>${LocationState.lastKnown(t)?`<span class="teammate-map-label">最後位置 · ${LocationState.age(t.located)}</span>`:''}`,`${t.owner_name} · ${LocationState.source(t)}`,()=>selectTarget(['friend','member'].includes(t.kind)?t.kind:'task',t.id));
@@ -323,7 +323,9 @@ function selectTarget(type,id){
   showPositionOnMap(p);renderMap();
 }
 function render(){
-  chatFriend?.identity();chat?.identity();profilePage?.identity();syncNewsFriends();
+  chatFriend?.identity();chat?.identity();profilePage?.identity();expeditionPreview?.sync();expeditionManagement?.sync();siteAccountAdmin?.sync();syncNewsFriends();
+  const withoutRoomContext=['tasks','friends'].includes(state.tab);
+  $('.sidebar-room-context').hidden=withoutRoomContext;$('.sidebar').classList.toggle('without-room-context',withoutRoomContext);
   $('#room-name').textContent=state.room.name;$('#room-date').textContent=state.demo?'建立或加入遠征隊，和夥伴一起出發':`${activityDate(state.room.event_date)} · ${activityVenues().find(v=>v.id===state.room.venue)?.name||''}`;
   renderVenueControl();
   $('#demo-banner').classList.toggle('hidden',!state.demo);
@@ -345,7 +347,7 @@ function render(){
   $('#publish-small').classList.toggle('hidden',state.tab==='friends');
   $('#search').placeholder=state.tab==='friends'?'搜尋好友暱稱或帳號…':state.tab==='tasks'?'找交換、配布物、或一點幫忙…':state.tab==='members'?'找你的遠征夥伴…':'找攤位、商店、或集合點…';
   $('#filters').innerHTML=state.tab==='tasks'?Object.entries({all:'全部',...types,mine:'我的任務'}).map(([k,v])=>`<button data-filter="${k}" class="${state.filter===k?'active':''}" aria-pressed="${state.filter===k}">${v}</button>`).join(''):'';
-  renderPanel();renderLocation();renderMap();
+  renderPanel();renderLocation();renderMap();expeditionPage?.sync();
 }
 function empty(title,detail){return `<div class="empty">${icon('spark')}<strong>${esc(title)}</strong>${esc(detail)}</div>`;}
 function renderPanel(){
@@ -384,8 +386,8 @@ function renderLocation(){
   $('#location-detail').textContent=detail;
   $('#location-button').textContent=active?'定位設定':'開啟定位';
 }
-function setTab(tab){mapActions?.dismiss();placeSearch?.close();state.tab=tab;state.query='';$('#search').value='';state.filter='all';$('.workspace').classList.add('panel-open');$$('.mobile-tabs button').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));render();$('#panel-content').scrollTop=0;}
-function showMap(){$('.workspace').classList.remove('panel-open');$$('.mobile-tabs button').forEach(b=>b.classList.toggle('active',b.dataset.mobile==='map'));if(map)setTimeout(()=>map.invalidateSize(),30);}
+function setTab(tab){hideExpeditionPage();mapActions?.dismiss();placeSearch?.close();state.tab=tab;state.query='';$('#search').value='';state.filter='all';$('.workspace').classList.add('panel-open');$$('.mobile-tabs button').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));render();$('#panel-content').scrollTop=0;}
+function showMap(){hideExpeditionPage();$('.workspace').classList.remove('panel-open');$$('.mobile-tabs button').forEach(b=>b.classList.toggle('active',b.dataset.mobile==='map'));if(map)setTimeout(()=>map.invalidateSize(),30);}
 function dialog(html){mapActions?.dismiss();placeSearch?.close();$('#dialog-body').innerHTML=html;icons($('#dialog'));if(!$('#dialog').open)$('#dialog').showModal();}
 function closeDialog(){$('#dialog').close();}
 
@@ -407,12 +409,13 @@ function showAuth(mode='login'){
     if(intent?.kind==='join')showJoin(intent.mode);
     else if(intent?.kind==='chat')chat.open();
     else if(intent?.kind==='profile')profilePage.open(intent.uid);
+    else if(intent?.kind==='expeditions-page'){showExpeditionPage();expeditionPage.selectMode(intent.mode);}
     chat.tick();
   });};
 }
 function showAccount(){
   if(!state.authenticated){authIntent=null;return showAuth();}
-  dialog(`<h2>你好，${esc(state.user.nickname)}。</h2><p class="account-username">@${esc(state.user.username)}</p>${TamagoTheme.control()}<form id="profile-form"><label for="profile-nickname">顯示暱稱</label><input id="profile-nickname" name="nickname" required maxlength="24" autocomplete="nickname" value="${esc(state.user.nickname)}"><p class="field-note">修改暱稱不會改變登入帳號或隊伍歸屬。</p><div class="form-error" role="alert"></div><button class="button secondary full" type="submit">儲存暱稱</button></form><div class="account-divider"></div><button class="button outline full" data-action="app-display">全螢幕／加入主畫面</button><button class="button outline full" data-action="password-settings">修改密碼</button><button class="button outline full logout-button" data-action="logout">登出這個裝置</button><p class="field-note">登出會停止目前定位分享；遠征隊、任務與地標會保留在帳號中。</p>`);
+  dialog(`<h2>你好，${esc(state.user.nickname)}。</h2><p class="account-username">@${esc(state.user.username)}</p>${TamagoTheme.control()}<form id="profile-form"><label for="profile-nickname">顯示暱稱</label><input id="profile-nickname" name="nickname" required maxlength="24" autocomplete="nickname" value="${esc(state.user.nickname)}"><p class="field-note">修改暱稱不會改變登入帳號或隊伍歸屬。</p><div class="form-error" role="alert"></div><button class="button secondary full" type="submit">儲存暱稱</button></form><div class="account-divider"></div>${state.user.site_admin?'<button type="button" class="button outline full" data-action="site-account-admin">帳號管理</button>':''}<button class="button outline full" data-action="app-display">全螢幕／加入主畫面</button><button class="button outline full" data-action="password-settings">修改密碼</button><button class="button outline full logout-button" data-action="logout">登出這個裝置</button><p class="field-note">登出會停止目前定位分享；遠征隊、任務與地標會保留在帳號中。</p>`);
   $('#profile-form').onsubmit=async e=>{e.preventDefault();await submit(e.target,async()=>{state.user={...state.user,...await api('/profile','POST',{nickname:new FormData(e.target).get('nickname')})};render();closeDialog();await refresh();toast('暱稱已更新。');});};
 }
 function showSettings(){
@@ -437,11 +440,11 @@ function showJoin(mode='browse'){
   if(!state.authenticated){authIntent={kind:'join',mode};return showAuth();}
   const params=new URLSearchParams(location.search),squadInvitation=mode==='code'&&/^[A-Za-z0-9]{8}$/.test(params.get('squad')||'');
   const options=activityVenues().map(v=>`<option value="${v.id}" ${v.id===activityVenue()?'selected':''}>${esc(v.name)}</option>`).join('');
-  const tabs=`<div class="form-tabs"><button data-action="join-mode" class="${mode==='browse'?'active':''}">場館遠征隊</button><button data-action="create-mode" class="${mode==='create'?'active':''}">建立遠征隊</button><button data-action="code-mode" class="${mode==='code'?'active':''}">邀請碼</button></div>`;
+  const tabs=`<div class="form-tabs"><button data-action="join-mode" class="${mode==='browse'?'active':''}">加入遠征隊</button><button data-action="create-mode" class="${mode==='create'?'active':''}">建立遠征隊</button><button data-action="code-mode" class="${mode==='code'?'active':''}">邀請碼</button></div>`;
   const title=mode==='create'?'號召同一場的夥伴。':mode==='code'?'用邀請碼加入。':'加入這一場的遠征隊。';
   const intro=`<h2>${squadInvitation?'接受小隊邀請。':title}</h2><p>隊員彼此不會看到座標；大家都能發布任務，分享現場情報。</p>${squadInvitation?'<p class="field-note">僅限與小隊內目前成員互為好友的人加入。確認後會加入邀請的遠征隊及小隊；若已有其他分組，將切換小隊並關閉原有的小隊／遠征隊／任務定位分享。好友分享及求助定位不受影響。</p>':''}${tabs}`;
   if(mode==='browse'){
-    dialog(`${intro}<label for="join-venue">選擇活動會場</label><select id="join-venue">${options}</select><div id="venue-catalog" aria-live="polite"><p class="field-note">正在載入遠征隊…</p></div><button class="button primary full" data-action="create-mode">＋ 建立這個場館的遠征隊</button>${!state.demo?`<button class="button outline full" data-action="manage-squads">遠征隊內的小隊組合</button>`:''}<button class="button outline full" data-action="owned-rooms">管理我建立的遠征隊</button>`);
+    dialog(`${intro}<label for="join-venue">選擇活動會場</label><select id="join-venue">${options}</select><div id="venue-catalog" aria-live="polite"><p class="field-note">正在載入遠征隊…</p></div><button class="button primary full" data-action="create-mode">＋ 建立這個場館的遠征隊</button><button class="button outline full" data-action="owned-rooms">管理我建立的遠征隊</button>`);
     let generation=0;
     async function loadCatalog(vid){
       const current=++generation,list=$('#venue-catalog');
@@ -527,10 +530,28 @@ function showInvite(squad=false){
   dialog(`<h2>${squad?'你的小隊，等你集合。':'把邀請碼交給夥伴。'}</h2><p>${esc(s.name)} · ${squad?'小隊邀請碼':'遠征隊邀請碼'}</p><div class="invite-code">${esc(s.code)}</div><div class="invite-url">${esc(url)}</div><p class="field-note">${squad?'小隊僅限好友加入；即使取得連結，非好友也無法加入小隊。':'邀請連結持有人可加入遠征隊並查看隊內任務。請只分享給同行夥伴。'}</p><button class="button primary full" data-action="copy" data-copy="${esc(url)}">複製邀請連結 ${icon('link')}</button>${squad?'<section id="squad-invite-friends"></section>':''}`);
   if(squad)squadInvites.mount($('#squad-invite-friends'),{eid:state.room.id,sid:s.id,user:state.user.id});
 }
-function showRooms(){
-  if(state.demo)return showJoin();
-  dialog(`<h2>今天，去哪裡遠征？</h2><p>選擇遠征隊，或和另一群朋友出發。</p>${state.rooms.map(r=>`<button class="room-item" data-action="switch-room" data-id="${esc(r.id)}"><span><strong>${esc(r.name)}</strong><small>${esc(activityDate(r.event_date))} · 邀請碼 ${esc(r.code)}</small></span>${icon('chevron')}</button>`).join('')}<button class="button primary full" data-action="join">＋ 加入或建立遠征隊</button><button class="button outline full" data-action="leave">退出目前遠征隊</button><button class="button outline full" data-action="manage-squads">遠征隊內的小隊組合</button><button class="button outline full" data-action="owned-rooms">管理我建立的遠征隊</button>${state.room.owner===state.user.id?`<button class="button outline full logout-button" data-action="delete-room" data-id="${esc(state.room.id)}">刪除目前遠征隊</button>`:''}`);
+function showRooms(){showExpeditionPage();}
+function expeditionRoute(){return ['#expeditions','#expeditions-main'].includes(location.hash);}
+function showExpeditionPage({route=true,focus=true}={}){
+  if(!expeditionPage||!config)return;
+  closeDialog();mapActions?.dismiss();placeSearch?.close();
+  if(route&&!expeditionRoute())history.pushState(null,'',location.pathname+location.search+'#expeditions');
+  document.body.classList.add('expeditions-open');$('#expeditions-page').hidden=false;
+  $('.skip-link').href='#expeditions-main';document.title='遠征隊 · 玉子燒支援隊';
+  $$('.mobile-tabs button').forEach(button=>button.classList.toggle('active',button.dataset.action==='expeditions'));
+  $$('[data-action=expeditions]').forEach(button=>button.setAttribute('aria-current','page'));
+  expeditionPage.open({focus});
 }
+function hideExpeditionPage(){
+  if(!expeditionPage?.visible())return;
+  $('#expeditions-page').hidden=true;document.body.classList.remove('expeditions-open');
+  $('.skip-link').href='#panel-content';document.title='玉子燒支援隊 · Tamagoyaki Support';
+  $$('[data-action=expeditions]').forEach(button=>button.removeAttribute('aria-current'));
+  if(expeditionRoute())history.pushState(null,'',location.pathname+location.search);
+  renderMap();if(map)setTimeout(()=>map.invalidateSize(),30);
+}
+window.addEventListener('hashchange',()=>{if(!config)return;if(expeditionRoute()&&!expeditionPage?.visible())showExpeditionPage({route:false});else if(!expeditionRoute()&&expeditionPage?.visible()){closeDialog();showMap();}});
+window.addEventListener('popstate',()=>{if(!config)return;if(expeditionRoute()&&!expeditionPage?.visible())showExpeditionPage({route:false});else if(!expeditionRoute()&&expeditionPage?.visible()){closeDialog();showMap();}});
 function showSquad(mode){
   if(state.demo)return showJoin();
   const create=mode==='create',roomId=state.room.id,userId=state.user.id;
@@ -796,17 +817,18 @@ document.addEventListener('click',async e=>{
     else if(action==='publish-intel')showPublish('pin',undefined,{lifetime:b.dataset.lifetime});
     else if(action==='ground-message')groundMessages.open();
     else if(action==='rooms')showRooms();
-    else if(action==='expeditions'){if(state.authenticated&&state.rooms.length)showRooms();else showJoin();}
+    else if(action==='expeditions')showExpeditionPage();
     else if(action==='friends-preview'){closeDialog();setTab('friends');}
+    else if(action==='site-account-admin')siteAccountAdmin.open();
     else if(action==='settings')showSettings();
     else if(action==='squads'){if(state.demo)showJoin();else{closeDialog();setTab('members');}}
+    else if(action==='manage-members'){const data=await api('/expeditions/owned'),room=data.expeditions.find(room=>room.id===b.dataset.id);if(room)expeditionManagement.open(room);}
     else if(action==='owned-rooms')await showOwnedRooms();
     else if(action==='delete-room')await showDeleteRoom(id);
     else if(action==='confirm-delete-room'){b.disabled=true;try{await deleteRoom(id);}finally{b.disabled=false;}}
     else if(action==='invite')showInvite();
     else if(action==='squad-invite')showInvite(true);
     else if(action==='squad-chat'&&!state.demo&&state.mine.squad===id)await chat.open('squad',id);
-    else if(action==='manage-squads'){closeDialog();setTab('members');}
     else if(action==='leave-squad'){b.disabled=true;try{await leaveSquad(id);}finally{b.disabled=false;}}
     else if(action==='help')help();
     else if(action==='create-squad'||action==='join-squad')showSquad(action==='create-squad'?'create':'join');
@@ -870,6 +892,16 @@ function syncNewsFriends(){
 }
 async function init(){
   icons();
+  expeditionPreview=new ExpeditionPreview({api,dialog,user:()=>state.authenticated?state.user:null,login:()=>{authIntent={kind:'expeditions-page',mode:'browse'};showAuth();},join:async(id,uid)=>{const room=await api(`/expeditions/${encodeURIComponent(id)}/join`,'POST',{});if(state.authenticated&&state.user.id===uid)await finishRoomJoin(room,false);}});
+  siteAccountAdmin=new SiteAccountAdmin({api,dialog,toast,user:()=>state.authenticated?state.user:null});
+  expeditionManagement=new ExpeditionMemberManagement({api,dialog,toast,user:()=>state.authenticated?state.user:null,changed:async uid=>{const me=await api('/me');if(state.authenticated&&state.user.id===uid){state.rooms=me.expeditions;if(!state.demo)await refresh({fresh:true});render();}}});
+  expeditionPage=new ExpeditionsPage($('#expeditions-page'),{
+    api,toast,preview:room=>expeditionPreview.open(room),manage:room=>expeditionManagement.open(room),context:()=>({user:state.authenticated?state.user:null,rooms:state.rooms,current:state.demo?null:state.room.id,venues:config?activityVenues():[],venue:config?activityVenue():null}),
+    rooms:rooms=>{state.rooms=rooms;},create:vid=>{state.activityVenue=vid;showJoin('create');},expired:()=>friends?.actions.expired(),back:showMap,
+    login:()=>{authIntent={kind:'expeditions-page',mode:expeditionPage.mode};showAuth();},
+    enter:async(id,uid)=>{if(!state.authenticated||state.user.id!==uid)return;const room=state.rooms.find(room=>room.id===id);if(!room)throw new Error('隊伍已變更，請重新整理。');if(state.demo||state.room.id!==id)await enterRoom(room,state.user);if(state.authenticated&&state.user.id===uid){showMap();toast('已進入 '+room.name+'。');}},
+    join:async(id,uid)=>{const room=await api(`/expeditions/${encodeURIComponent(id)}/join`,'POST',{});if(state.authenticated&&state.user.id===uid)await finishRoomJoin(room,false);}
+  });
   pinFilters=new PinFilters($('#pin-filter'),$('#pin-filter-handle'),{stage:$('.map-stage'),user:()=>state.authenticated?state.user.id:null,target:()=>state.target,changed:()=>{if(config)render();}});
   landmarkReports=new LandmarkReportBoard({api,toast,user:()=>state.authenticated?state.user:null,refresh:()=>refresh({fresh:true}),context:()=>{const pin=targetPoint();return state.authenticated&&!state.demo&&state.target?.type==='pin'&&pin?.kind!=='message'&&pin?{user:state.user.id,eid:state.room.id,pid:pin.id}:null;}});
   groundMessages=new GroundMessages({
@@ -934,7 +966,7 @@ async function init(){
     state.authenticated=!!me.user;if(me.user)state.user=me.user;assistance.sync(me.help_rooms||[]);render();
     if(me.user&&me.expeditions.length){let saved;try{saved=localStorage.getItem('tamago-room');}catch{}const room=me.expeditions.find(r=>r.id===saved)||me.expeditions[0];await enterRoom(room,me.user,{preserveMap:restoreVenue});}
     if(me.user){await friends.sync();chat.tick();}
-    const params=new URLSearchParams(location.search);if(params.has('join'))showJoin('code');
+    const params=new URLSearchParams(location.search);if(params.has('join'))showJoin('code');else if(expeditionRoute())showExpeditionPage({route:false});
     pollTimer=setInterval(()=>{
       if(state.position&&!LocationState.valid(lastPositionAt/1000)){state.position=null;renderLocation();renderMap();}
       assistance.tick();landmarkReports.tick();refreshGPS();if(!state.demo)refresh();if(state.authenticated){friends.sync();chat.tick();}

@@ -1,0 +1,8 @@
+.site-admin-count{padding:12px;background:var(--green-soft);border-radius:8px;color:var(--green);font-size:13px}
+.site-admin-search{display:flex;align-items:center;gap:8px}.site-admin-search input{min-width:0;flex:1;margin:0;font-size:16px}.site-admin-search button{min-height:44px}
+.site-admin-scroll{max-height:min(44dvh,420px);overflow:auto;overscroll-behavior:contain;padding:0 4px;scrollbar-width:thin}
+.site-admin-person{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 0;border-bottom:1px solid var(--line)}
+.site-admin-person>div:first-child{flex:1;min-width:0;overflow-wrap:anywhere}.site-admin-person strong{font-size:13px}.site-admin-person p{font-size:11px;margin:4px 0;color:var(--muted)}.site-admin-person small{font-size:10px;color:var(--muted)}
+.site-admin-person>.button{font-size:12px;min-height:44px;padding:8px 12px}
+.site-admin-confirm{flex-basis:100%;padding:12px;background:var(--green-soft);border-radius:8px}.site-admin-confirm p{font-size:12px;color:var(--ink);margin:0 0 12px}.site-admin-confirm button{min-height:44px;font-size:12px;margin-right:8px}
+[data-admin-more][hidden]{display:none}

@@ -6,7 +6,7 @@ class TeammateFinder {
     this.select=root.querySelector('#finder-person');this.body=root.querySelector('#finder-body');
     this.grip=root.querySelector('#finder-grip');this.collapsed=false;this.selectedId=null;this.optionsKey='';
     this.model={tasks:[],ready:false,roomId:null};this.drag=null;
-    this.launcher.addEventListener('click',()=>this.open());
+    this.launcher?.addEventListener('click',()=>this.open());
     this.select.addEventListener('change',()=>{this.selectedId=this.select.value||null;this.revoked=false;this.render();});
     root.querySelector('#finder-close').addEventListener('click',()=>this.close());
     root.querySelector('#finder-collapse').addEventListener('click',()=>{
@@ -52,10 +52,11 @@ class TeammateFinder {
   open(id){
     if(id&&this.model.tasks.some(t=>t.id===id))this.selectedId=id;
     else if(!this.selectedId&&this.model.ready)this.selectedId=this.model.tasks[0]?.id||null;
-    this.root.hidden=false;this.launcher.hidden=true;this.launcher.setAttribute('aria-expanded','true');
+    if(this.root.hidden)this.returnFocus=document.activeElement;
+    this.root.hidden=false;if(this.launcher){this.launcher.hidden=true;this.launcher.setAttribute('aria-expanded','true');}
     this.revoked=false;this.render();this.clamp();this.grip.focus({preventScroll:true});
   }
-  close(){this.root.hidden=true;this.launcher.hidden=false;this.launcher.setAttribute('aria-expanded','false');this.launcher.focus({preventScroll:true});}
+  close(){this.root.hidden=true;if(this.launcher){this.launcher.hidden=false;this.launcher.setAttribute('aria-expanded','false');this.launcher.focus({preventScroll:true});}else{const target=this.returnFocus?.isConnected&&!this.root.contains(this.returnFocus)&&this.returnFocus.getClientRects().length?this.returnFocus:document.querySelector('#map');target?.focus({preventScroll:true});}}
   update(model){
     if(model.roomId!==this.model.roomId){this.selectedId=null;this.revoked=false;}
     this.model=model;

@@ -5,7 +5,7 @@ async function showOwnedRooms(){
   const root=$('#owned-rooms'),uid=state.user.id;
   try{
     const data=await api('/expeditions/owned');if(!root.isConnected||state.user.id!==uid)return;
-    root.innerHTML=data.expeditions.map(room=>`<article class="room-item owned-room"><div><strong>${esc(room.name)}</strong><small>${esc(activityDate(room.event_date))} · ${esc(activityVenues().find(v=>v.id===room.venue)?.name||room.venue)}</small></div><button class="button outline logout-button" data-action="delete-room" data-id="${esc(room.id)}">刪除</button></article>`).join('')||empty('還沒有建立的遠征隊','建立隊伍後，可在這裡管理。');
+    root.innerHTML=data.expeditions.map(room=>`<article class="room-item owned-room"><div><strong>${esc(room.name)}</strong><small>${esc(activityDate(room.event_date))} · ${esc(activityVenues().find(v=>v.id===room.venue)?.name||room.venue)}</small></div><button class="button outline" data-action="manage-members" data-id="${esc(room.id)}">管理成員</button><button class="button outline logout-button" data-action="delete-room" data-id="${esc(room.id)}">刪除</button></article>`).join('')||empty('還沒有建立的遠征隊','建立隊伍後，可在這裡管理。');
   }catch(error){if(root.isConnected)root.textContent=error.message;}
 }
 async function showDeleteRoom(id){
