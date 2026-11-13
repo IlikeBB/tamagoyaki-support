@@ -1,0 +1,6 @@
+{
+  "tunnelName": "TamagoyakiSupport",
+  "tunnelId": "YOUR_CLOUDFLARE_TUNNEL_ID",
+  "hostname": "tamagoyaki-support.example.com",
+  "port": 8078
+}

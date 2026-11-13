@@ -1,0 +1,23 @@
+import {chromium,expect} from '@playwright/test';
+import {randomBytes} from 'node:crypto';
+const origin=process.env.QA_ORIGIN;
+if(origin!=='http://127.0.0.1:8079')throw new Error('Optional date writes require isolated QA port 8079.');
+const browser=await chromium.launch({headless:true,executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'}),users=[],errors=[],checks=[],suffix=randomBytes(5).toString('hex');
+try{
+ for(const nickname of ['隨時出發的小玉','同行夥伴']){
+  const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,extraHTTPHeaders:{'X-Tamago-Client':'web'}});
+  const response=await context.request.post(origin+'/api/auth/register',{data:{username:'date_'+users.length+'_'+suffix,nickname,password:'Isolated optional event date 2026!'}});expect(response.ok()).toBe(true);
+  const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));users.push({context,page});await page.goto(origin);await expect.poll(()=>page.evaluate(()=>state.authenticated&&!!map),{timeout:25000}).toBe(true);await page.evaluate(()=>clearInterval(pollTimer));
+ }
+ const [a,b]=users;
+ async function createForm(){await a.page.locator('.header-actions [data-action=join]').click();await a.page.locator('#dialog [data-action=create-mode]').first().click();await a.page.locator('#venue').selectOption('taiwan');}
+ await createForm();await expect(a.page.locator('#include-date')).not.toBeChecked();await expect(a.page.locator('#event-date')).toBeDisabled();await expect(a.page.locator('#event-date-fields')).toBeHidden();await a.page.locator('#name').fill('隨時集合 '+suffix);
+ await a.page.locator('#include-date').check();await expect(a.page.locator('#event-date')).toBeVisible();await a.page.locator('#event-date').fill('2026-11-14');await a.page.locator('#include-date').uncheck();await a.page.screenshot({path:'artifacts/optional-date-off-mobile.png'});await a.page.locator('#join-form [type=submit]').click();await expect(a.page.locator('#dialog')).not.toBeVisible();await expect(a.page.locator('#room-date')).toHaveText('未指定日期 · 台灣');const undated=await a.page.evaluate(()=>state.room);expect(undated.event_date).toBe('');
+ await createForm();await a.page.locator('#name').fill('有日期的場次 '+suffix);await a.page.locator('#include-date').check();await a.page.locator('#event-date').fill('');expect(await a.page.locator('#join-form').evaluate(form=>form.checkValidity())).toBe(false);await a.page.locator('#event-date').fill('2026-11-14');await a.page.screenshot({path:'artifacts/optional-date-on-mobile.png'});await a.page.locator('#join-form [type=submit]').click();await expect(a.page.locator('#dialog')).not.toBeVisible();await expect(a.page.locator('#room-date')).toHaveText('2026-11-14 · 台灣');
+ checks.push('date checkbox defaults off, reveals a required date when checked, and ignores a previous value after unchecking; supplied dates still save and display normally');
+ await b.page.locator('.header-actions [data-action=join]').click();await b.page.locator('#join-venue').selectOption('taiwan');await expect(b.page.locator(`#venue-catalog [data-room-id="${undated.id}"]`)).toContainText('未指定日期');await b.page.locator(`#venue-catalog [data-room-id="${undated.id}"]`).click();await expect(b.page.locator('#room-date')).toHaveText('未指定日期 · 台灣');await b.page.reload();await expect(b.page.locator('#room-date')).toHaveText('未指定日期 · 台灣');
+ await b.page.locator('#account-button').click();await expect(b.page.locator('.profile-wall-card')).toContainText('未指定日期');await b.page.locator('#profile-close').click();
+ const path='/api/expeditions/'+undated.id,pin=await (await a.context.request.post(origin+path+'/pins',{data:{title:'沒有活動日期的集合情報',kind:'meet',lat:25.03,lng:121.56,hours:2}})).json();expect((await b.context.request.put(origin+path+'/pins/'+pin.id+'/vote',{data:{value:1}})).ok()).toBe(true);
+ await a.page.locator('#account-button').click();await a.page.locator('[data-profile-action=tab][data-tab=received]').click();await expect(a.page.locator('.profile-feedback-card')).toContainText('未指定日期');await a.page.locator('#profile-close').click();await a.page.locator('.header-actions [data-action=join]').click();await a.page.locator('[data-action=owned-rooms]').click();await expect(a.page.locator('.owned-room').filter({hasText:'隨時集合'})).toContainText('未指定日期');
+ checks.push('undated rooms remain discoverable and joinable; reload, room header, profile wall, landmark feedback and owner management all display an explicit date placeholder');expect(errors).toEqual([]);console.log(JSON.stringify({ok:true,checks,errors}));
+}finally{await browser.close();}

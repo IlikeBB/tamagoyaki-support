@@ -1,0 +1,1 @@
+{"name":"tamagoyaki-support-qa","private":true,"description":"Browser verification only; the application runs in Python.","scripts":{"test:ui":"node scripts/browser-test.mjs"},"devDependencies":{"@playwright/test":"^1.58.0"}}

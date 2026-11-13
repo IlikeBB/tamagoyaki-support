@@ -1,0 +1,53 @@
+import {chromium,expect} from '@playwright/test';
+const browser=await chromium.launch({headless:true,executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'});
+const origin=process.argv[2]||'http://127.0.0.1:8079',errors=[];
+try{
+ const page=await browser.newPage({viewport:{width:390,height:844},hasTouch:true});page.on('pageerror',e=>errors.push(e.message));
+ const room={id:'finder-ui',name:'尋人視窗測試',venue:'makuhari',event_date:'2026-11-13',code:'UITEST01'};
+ const user={id:'receiver',nickname:'你',username:'finder_qa'};
+ const task=(id,extra={})=>({id,owner:'captain',owner_name:'小狐 <img src=x>',assignee:'receiver',title:'現場交換',status:'accepted',lat:35.6483,lng:140.0346,created:Date.now()/1000,expires:Date.now()/1000+3600,location_visible:true,location_source:'published',accuracy:null,kind:'trade',...extra});
+ const snapshot={room,members:[],squads:[],pins:[],me:{user:'receiver',scope:'off',squad:null},tasks:[task('allowed'),task('live',{location_source:'live',located:Date.now()/1000,accuracy:12}),task('unaccepted',{status:'open',assignee:null,location_visible:false,lat:null,lng:null}),task('other-receiver',{assignee:'stranger',location_visible:false,lat:null,lng:null}),task('own',{owner:'receiver'}),task('expired',{expires:1})]};
+ await page.route('**/api/me',route=>route.fulfill({json:{user,expeditions:[room]}}));
+ await page.route('**/api/friends',route=>route.fulfill({json:{friends:[],incoming:[],outgoing:[],sharing:false}}));
+ await page.route('**/api/expeditions/finder-ui',route=>route.fulfill({json:snapshot}));
+ await page.goto(origin);await expect(page.locator('#finder-launcher')).toBeVisible();
+ await expect.poll(()=>page.evaluate(()=>lastTeamSyncAt>0),{timeout:25000}).toBe(true);
+ await page.locator('#finder-launcher').click();await expect(page.locator('#teammate-finder')).toBeVisible();
+ await expect(page.locator('#finder-person option')).toHaveCount(3);
+ await expect(page.locator('#finder-name')).toHaveText('小狐 <img src=x>');await expect(page.locator('#teammate-finder img')).toHaveCount(0);
+ await expect(page.locator('#finder-needs-location')).toBeVisible();await expect(page.locator('#finder-guidance')).not.toBeVisible();
+ await page.evaluate(()=>{state.position={lat:35.6490,lng:140.0350,accuracy:10};lastPositionAt=Date.now();renderFinder();});
+ await expect(page.locator('#finder-distance')).toContainText('m');await expect(page.locator('#finder-direction')).toContainText('北朝上');
+ const initialRotation=await page.locator('#finder-arrow').evaluate(e=>e.style.transform);
+ await page.evaluate(()=>{state.heading=90;renderFinder();});
+ expect(await page.locator('#finder-arrow').evaluate(e=>e.style.transform)).not.toBe(initialRotation);
+ await expect(page.locator('#finder-direction')).toContainText('相對手機朝向');
+ await page.locator('#finder-person').selectOption('live');await expect(page.locator('#finder-source')).toContainText('即時位置');
+ await page.locator('#finder-person').selectOption('allowed');await expect(page.locator('#finder-source')).toContainText('發布時的位置');
+ const before=await page.locator('#teammate-finder').boundingBox(),grip=await page.locator('#finder-grip').boundingBox();
+ await page.mouse.move(grip.x+12,grip.y+20);await page.mouse.down();await page.mouse.move(grip.x-35,grip.y+80,{steps:5});await page.mouse.up();
+ const after=await page.locator('#teammate-finder').boundingBox();expect(after.x).toBeLessThan(before.x);expect(after.y).toBeGreaterThan(before.y);
+ await page.locator('#finder-grip').focus();await page.keyboard.press('ArrowRight');
+ expect((await page.locator('#teammate-finder').boundingBox()).x).toBeGreaterThan(after.x);
+ await page.locator('#finder-collapse').click();await expect(page.locator('#finder-body')).not.toBeVisible();
+ await page.locator('.mobile-tabs [data-tab=tasks]').click();await expect(page.locator('#teammate-finder')).toBeVisible();await expect(page.locator('#finder-summary')).toContainText('m');
+ await page.locator('#finder-collapse').click();
+ await page.screenshot({path:'artifacts/finder-mobile.png'});
+ await page.context().setOffline(true);await expect(page.locator('#finder-name')).toHaveText('');await expect(page.locator('#finder-distance')).toHaveText('');await expect(page.locator('#finder-empty-message')).toContainText('同步');
+ await page.context().setOffline(false);await expect(page.locator('#finder-name')).toHaveText('小狐 <img src=x>',{timeout:15000});
+ const stale=await page.evaluate(()=>{lastTeamSyncAt=Date.now()-21000;renderFinder();return document.querySelector('#finder-distance').textContent;});expect(stale).toBe('');
+ await page.evaluate(()=>refresh());
+ const staleGPS=await page.evaluate(()=>{lastPositionAt=Date.now()-121000;renderFinder();return document.querySelector('#finder-guidance').hidden;});expect(staleGPS).toBe(true);
+ await page.evaluate(()=>{lastPositionAt=Date.now();renderFinder();});
+ for(const width of [320,390,768,1024,1440]){
+  await page.setViewportSize({width,height:900});
+  const box=await page.locator('#teammate-finder').boundingBox();expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(width);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ }
+ await page.locator('#finder-grip').focus();await page.keyboard.press('Home');await page.screenshot({path:'artifacts/finder-desktop.png'});
+ snapshot.tasks=snapshot.tasks.map(t=>({...t,status:'done'}));await page.evaluate(()=>refresh());
+ await expect(page.locator('#finder-name')).toHaveText('');await expect(page.locator('#finder-distance')).toHaveText('');await expect(page.locator('#finder-source')).toHaveText('');
+ await page.locator('#finder-close').click();await expect(page.locator('#finder-launcher')).toBeFocused();
+ await page.keyboard.press('Enter');await expect(page.locator('#finder-empty-message')).toContainText('任務');
+ expect(errors).toEqual([]);console.log(JSON.stringify({ok:true,checks:['authorized task targets only','safe text rendering','local GPS and compass directions','published/live position labels','pointer and keyboard dragging','collapse across page tabs','offline and stale GPS hide guidance','responsive bounds','revocation clears location','keyboard focus'],errors}));
+}finally{await browser.close();}

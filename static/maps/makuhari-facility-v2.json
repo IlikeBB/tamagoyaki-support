@@ -1,0 +1,161 @@
+{
+  "image": "/static/maps/makuhari-facility-v2.svg",
+  "bounds": [
+    [
+      35.64486172136874,
+      140.03145589650558
+    ],
+    [
+      35.650869487413104,
+      140.03768122142455
+    ]
+  ],
+  "source": "https://www.m-messe.co.jp/facility/",
+  "original": "https://www.m-messe.co.jp/static/images/facility/floormap.svg",
+  "groundReference": "https://www.openstreetmap.org/api/0.6/map?bbox=140.027,35.642,140.042,35.654",
+  "prepared": "2026-11-06",
+  "alignment": "Approximate per-building affine fits; this official multi-floor schematic is not a surveyed map.",
+  "removedArtworkIconGroups": 116,
+  "parts": [
+    {
+      "id": "halls-1-8",
+      "anchors": [
+        {
+          "pixel": [
+            187,
+            18.2
+          ],
+          "latlng": [
+            35.6449717,
+            140.0359558
+          ]
+        },
+        {
+          "pixel": [
+            1064,
+            18.2
+          ],
+          "latlng": [
+            35.6482036,
+            140.0314924
+          ]
+        },
+        {
+          "pixel": [
+            187,
+            239.6
+          ],
+          "latlng": [
+            35.6459366,
+            140.0369604
+          ]
+        }
+      ]
+    },
+    {
+      "id": "halls-9-11",
+      "anchors": [
+        {
+          "pixel": [
+            625,
+            525
+          ],
+          "latlng": [
+            35.6486853,
+            140.0361528
+          ]
+        },
+        {
+          "pixel": [
+            871,
+            525
+          ],
+          "latlng": [
+            35.6494139,
+            140.035099
+          ]
+        },
+        {
+          "pixel": [
+            625,
+            912
+          ],
+          "latlng": [
+            35.6500967,
+            140.0376305
+          ]
+        }
+      ]
+    },
+    {
+      "id": "conference",
+      "anchors": [
+        {
+          "pixel": [
+            250,
+            272.8
+          ],
+          "latlng": [
+            35.646295,
+            140.0366836
+          ]
+        },
+        {
+          "pixel": [
+            410,
+            272.8
+          ],
+          "latlng": [
+            35.6468066,
+            140.0359697
+          ]
+        },
+        {
+          "pixel": [
+            410,
+            408
+          ],
+          "latlng": [
+            35.647241,
+            140.0364383
+          ]
+        }
+      ]
+    },
+    {
+      "id": "event-hall",
+      "anchors": [
+        {
+          "pixel": [
+            735,
+            333
+          ],
+          "latlng": [
+            35.64823,
+            140.0347
+          ]
+        },
+        {
+          "pixel": [
+            835,
+            333
+          ],
+          "latlng": [
+            35.64863,
+            140.03414
+          ]
+        },
+        {
+          "pixel": [
+            735,
+            413
+          ],
+          "latlng": [
+            35.648614,
+            140.035116
+          ]
+        }
+      ]
+    }
+  ]
+}

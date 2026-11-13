@@ -1,0 +1,164 @@
+# 玉子燒支援隊 · Tamagoyaki Support
+
+手機優先的遠征會合網頁。Python FastAPI、SQLite，前端使用原生 JavaScript 與自架 Leaflet 1.9.4。正式網址：https://tamagoyaki-support.modoubletw.com/
+
+## 使用方式
+
+1. 按右上「登入」→「註冊帳號」，設定登入名稱、密碼與顯示暱稱；再按「開始組隊」建立活動遠征隊或輸入邀請碼。
+2. 在各場館的遠征隊列表選擇加入，也可建立遠征隊並選擇是否出現在場館列表；私人隊伍以邀請碼加入。
+
+活動會場另提供「台灣」與「日本」，可建立或瀏覽未指定單一場館的遠征隊，個人檔案與管理列表顯示對應地區名稱。加入這類隊伍會解除場館周邊一公里限制，可用定位與地點搜尋查看實際集合地點；地圖中心選單仍使用已核對座標的四個固定場館。
+
+建立隊伍預設不指定活動日期；勾選「添加活動日期」才顯示日期欄位，勾選後必須填寫有效日期。未指定日期的公開隊伍持續列在該會場的隊伍列表，介面統一顯示「未指定日期」；有日期的隊伍仍依原本日期範圍驗證及列表過期規則處理。既有日期資料保留。API 可省略 `event_date` 或傳入 `null`／空字串，SQLite 與歷史紀錄以空字串儲存未指定日期。
+3. 開啟「定位設定」選擇分享對象：僅供本機、只給好友、只給目前遠征隊、只給任務接取者。一次只使用一種模式，切換時先撤回原本的即時分享；加入隊伍不會自動公開個人位置。
+4. 發布交換、懸賞、配布或求助任務時，先取得目前 GPS 位置。任務發布點只有發布者與目前接取者能取得；即時位置依定位設定的分享對象提供。切換為好友或本機模式時，接取者改用任務發布點。
+5. 到「情報點」或「隊友」建立隊內情報，分享攤位、官店、洗手間或集合點。情報點的座標分享給同一遠征隊，與個人即時位置分開。臨時資訊可設到期時間，永久情報保留在該遠征隊。
+6. 在「好友」輸入對方的帳號名稱送出邀請，由對方接受。好友關係不需要加入遠征隊或小隊；開啟「我的好友位置分享」後，已接受的好友可查看你的即時位置。可獨立關閉好友分享、取消／拒絕邀請或移除好友。
+
+碰觸地圖左邊緣或按左側「篩選」可展開人物篩選，選擇所有人、好友、目前遠征隊成員、同小隊隊友。篩選僅作用於已獲授權的位置，不會公開其他成員座標；自己的位置及情報點繼續顯示。篩選偏好保存在目前瀏覽器。
+
+好友與已接取任務的目標使用方向箭頭、暱稱與距離提示，也可開啟尋人小窗。查看一公里外的好友會自動解除地圖範圍限制。好友位置不受隊伍切換或退出影響；GPS 分享需要連線及定位權限。切到背景或離開網頁不會主動撤回；最後一次 GPS 位置保留 15 分鐘，2–15 分鐘標示「最後位置」與更新時間，超過 15 分鐘隱藏。只保存一筆座標，不記錄歷史軌跡。
+
+目前地圖以幕張メッセ為預設場館，覆蓋經處理、約略對齊的場館圖。右上角中心地標選單可切換幕張、Kアリーナ横浜、ぴあアリーナMM、有明アリーナ；選擇後會移到該場館並開啟周邊一公里範圍。這四處也會顯示固定地標，按標記可切換範圍中心。「1 km 範圍」關閉後可自由移動地圖，查看範圍外有權取得的位置與情報點。中心地標與範圍開關會儲存在目前瀏覽器，重新整理及同步隊伍時保留；切換地圖中心不會切換遠征隊成員資格。
+
+未登入或未加入遠征隊也可使用本機定位。首次取得 GPS 後會移到實際所在地；若位置在場館一公里外（例如在台灣測試），會自動解除範圍限制並顯示「我的位置」。後續定位更新不會打斷使用者拖曳地圖；「回到我的位置」按鈕可再次移回所在地，沒有有效位置時會開啟定位設定。本機模式不上傳即時座標；其他模式在使用者主動同意後，依好友、目前遠征隊或任務接取權限提供位置。
+
+首頁預設沒有自動加入遠征隊，必須選擇建立或加入隊伍才可發布任務。舊有遠征隊不會在更新時自動公開到場館列表。既有共享地標保留。
+
+## 執行與部署
+
+```powershell
+git clone https://github.com/IlikeBB/tamagoyaki-support.git
+cd tamagoyaki-support
+conda run -n agent python -m pip install -r requirements-tested.txt
+conda run --no-capture-output -n agent python server.py
+```
+
+本機網址為 `http://127.0.0.1:8078`。正式部署沿用 CozyPad 的本機服務＋Cloudflare Tunnel 方式，但使用獨立 Tunnel，不會重啟 CozyPad。
+
+版本控制包含程式、靜態資源、測試與設定範例。`data/` 的帳號、訊息、頭貼與橫幅，以及金鑰、實際部署設定、執行日誌、備份和 `artifacts/` 測試產物保留於本機。
+
+要使用 Cloudflare Tunnel，先複製 `scripts/cloudflare-public.example.json` 為 `scripts/cloudflare-public.json`，填入自己的 Tunnel ID 與網域，並備妥登入帳號下的 `.cloudflared` 憑證。範例檔不含可用憑證。
+
+```powershell
+# 首次登記 DNS；不會覆蓋既有同名記錄
+powershell -NoProfile -File .\scripts\start-public.ps1 -RegisterDns
+# 後續啟動會檢查並重用本專案程序
+powershell -NoProfile -File .\scripts\start-public.ps1
+# 僅停止經過身分驗證的本專案程序
+powershell -NoProfile -File .\scripts\stop-public.ps1
+```
+
+Tunnel 憑證保存在使用者的 `.cloudflared`，不納入專案。設定在 `scripts/cloudflare-public.json`，日誌與程序資訊在 `.run-logs/`，資料庫在 `data/`。此部署依賴本機持續開機與連線，沒有設定開機自啟。修改 Python 後需停止本專案再啟動。備份 SQLite 時請停止本專案，或使用 SQLite backup API；不要只複製正在寫入的主資料庫檔。
+
+環境變數：`TAMAGO_ORIGIN`（正式 HTTPS 來源，會啟用 Secure Cookie）、`TAMAGO_PORT`（預設 8078）、`TAMAGO_DB`（可指定獨立資料庫）。啟動腳本會設定正式來源。
+
+## 定位與身分
+
+- 定位預設關閉，只有使用者同意後才向瀏覽器請求定位。好友、目前遠征隊、任務接取者為互斥的即時分享模式，也可選擇僅供本機；不提供獨立的小隊共享模式。
+- 遠征隊模式需加入該隊，不必先發布任務。只有目前選定的隊伍成員能取得新鮮座標；分享給其他隊伍、改給好友或停止分享時，先清除原本的即時座標。離隊及位置過期後不再提供。完成任務不會中斷另行同意的遠征隊分享。
+- 好友邀請需雙方接受。好友位置 API 與隊伍 API 分離，未接受的邀請沒有位置欄位；只有已接受的好友可取得對方主動分享且未過期的座標。拒絕、取消或移除關係立即撤銷存取。好友分享每次只保存最新座標，過期後於下一次每分鐘清理時刪除；停止分享、登出及改密碼也會清除。
+- 開啟定位後可按資訊卡右側的「×」收起資訊卡，持續接收定位；按縮小後的「定位設定」可重新開啟設定。只有選擇「停止即時定位」才會停止定位，收起資訊卡不會擴大座標分享權限。
+- 每 5 秒同步隊伍資料。只保存最後一筆座標，不記錄軌跡；2–15 分鐘未更新的座標標示為最後位置，超過 15 分鐘不對隊友顯示，並於下一次每分鐘清理時移除。讀取快照不會延長 GPS 有效期；同一筆 GPS 樣本不重複上傳。
+- 任務發布點只回傳給發布者本人，以及進行中任務的目前接取者。其他成員不會從任務 API 取得發布點或任務距離；另行同意的遠征隊即時分享由成員位置提供。接取者完成、放棄，或任務撤回、到期後，不再提供任務發布點。
+- 停止即時定位後，接取者仍能使用任務發布時的位置；撤回或結束任務可停止提供此座標。情報點是明確發布的隊內共享地點，不屬於隊員即時位置。
+- 帳號名稱為 3–32 位英數字、底線、句點或連字號（開頭為英數字），不分大小寫；暱稱可使用中文。新密碼為 15–128 個字元，支援中文與空格，不會自動去除密碼前後空格。
+- 密碼使用 Argon2id（19 MiB、2 次迭代、1 執行緒）與隨機 salt 雜湊；不儲存明文密碼。登入憑證為隨機 256-bit token，資料庫只存其 SHA-256，透過 HttpOnly、SameSite=Lax Cookie 保存 30 天，正式環境加上 Secure。
+- 支援註冊、跨裝置登入、登出、修改暱稱與修改密碼。登出會在伺服器撤銷目前登入憑證並停止定位；修改密碼需驗證目前密碼，會撤銷其他裝置的登入並停止定位，目前裝置則換發登入憑證。
+- 登入按來源 IP 與帳號分別限速，錯誤帳號與錯誤密碼使用相同訊息。密碼處理最多四個並行請求；超額回傳可重試的 429。驗證錯誤不回傳輸入的密碼。
+- 帳號不會隨 30 天登入憑證到期而刪除。清除 Cookie 後可用帳號密碼重新登入並取回資料；舊訪客在原瀏覽器註冊會沿用原身分與資料歸屬。目前沒有電子郵件驗證、忘記密碼重設或帳號復原，請妥善保存帳號密碼。
+- 公開遠征隊的名稱、日期與成員人數會出現在其場館列表；登入帳號可選擇加入。未公開的遠征隊只接受邀請碼。任務與情報點的內容只對成員開放；成員名單只提供主動開啟遠征隊分享且未過期的位置。
+- 任務接取以 SQLite 交易避免重複接單。只有發布者或接取者可完成，只有發布者可撤回，只有接取者可放棄。
+- 公開測試版採單一 Python 程序、SQLite。大型活動上線前應加入帳號復原、成員管理／封鎖／檢舉、負載測試與集中式速率限制。
+
+## 網頁能力限制
+
+方向浮標只顯示在本網頁內，不能跨其他 App 懸浮。手機指南針需裝置支援與授權；沒有絕對方位時北朝上。距離是直線距離，不是導航路線，室內 GPS 可能誤差很大。鎖屏、切到背景或斷網時無法保證 GPS 繼續更新；網頁維持 watchPosition，保留最後位置 15 分鐘，回到前景或 BFCache 恢復時立即請求新 GPS 並重新同步分享權限。暫時定位錯誤保留最後位置並重試；手動停止、登出、拒絕定位權限仍立即撤回。
+
+可以加入手機主畫面；Service Worker 不快取私人 API 或地圖圖磚，不提供離線定位。
+
+## 個人檔案與地標評價
+
+點右上角帳號開啟個人檔案，可編輯暱稱、160 字簡介、頭貼與橫幅；好友、隊友與地標發布者的頭貼可開啟對方檔案。帳號設定仍從自己的檔案進入。JPG／PNG／WebP 照片限 12 MB，在瀏覽器以滑桿裁切成 320×320 頭貼或 1200×400 橫幅 PNG；伺服器驗證尺寸、CRC 與解壓縮長度，移除中繼資料，圖片僅提供給已登入者。照片確認裁切後立即儲存，文字另按儲存。
+
+遠征隊牆展示參加過的隊伍與場次，退出後保留紀錄，重新加入不重複計數。私人隊伍卡片只向本人與該隊目前成員顯示。啟用功能時補入仍在參加的隊伍與已建立的隊伍；此前已退出且未曾記錄的參加歷史無法還原。
+
+遠征隊建立者可從「遠征隊 → 管理我建立的遠征隊」，或個人檔案的場次卡片刪除隊伍，退出後仍能管理。刪除需在介面確認，伺服器會在寫入交易內驗證建立者身分；清除該隊的任務、所有隊內地標、小隊、成員定位、求助定位及群聊，不影響其他遠征隊、好友分享或私訊。邀請碼立即失效。場次名稱、場館、日期與參加歷史另存為不含邀請碼的紀錄，個人檔案標示「遠征隊已刪除」，地標評價亦保留；私人場次仍依權限顯示。
+
+有效期間內的臨時地標提供「有效／無效」評價，僅該遠征隊目前成員可操作，發布者不能評價自己。每人一票，可切換或再次點擊收回。當無效票數嚴格大於有效票數時，會在同一筆投票交易中自動刪除臨時地標；平票保留，首張無效票亦適用。收回有效票後若變成無效票較多，也會移除。地標與評價封存紀錄仍保留，之後收回評價不會讓地標復原。啟動時會套用至既有符合條件的臨時地標，永久地標不受影響。手動刪除仍限建立者或隊長。個人檔案顯示收到的讚／倒讚總數、權限允許的來源紀錄，以及僅本人可見的「我的評價」。到期或刪除地標仍保留評價紀錄，退出後也能收回自己的歷史評價；封存資料不保存座標或描述。私人來源依隊伍成員權限過濾，總數包含歷年回饋。檔案與圖片不使用 Service Worker 快取，登出清空已載入的個人檔案。
+
+## 好友私訊與遠征隊群聊
+
+按上方訊息圖示開啟對話列表，可篩選好友與遠征隊，也可從好友的「聊天」按鈕或隊友頁的「遠征隊群聊」直接進入。支援 2000 字以內的純文字、換行、表情、每 5 秒同步、未讀數與分頁載入歷史紀錄。Ctrl／⌘ + Enter 可傳送，Enter 保留換行；傳送失敗保留草稿，重試使用同一訊息識別碼以避免重複。
+
+私訊只提供給已互相接受邀請的好友；群聊只提供給目前隊員，包含現有群聊紀錄。每次讀取、傳送與更新已讀游標都重新驗證身分與關係。移除好友或退出遠征隊後立即拒絕後續存取；重新建立關係後可查看原有紀錄。訊息保存於 SQLite，僅以純文字顯示，不附帶定位座標；聊天內容與草稿不放進 localStorage 或 Service Worker 快取。登出與切換帳號會清空頁面中的聊天狀態。未讀提示是網站內提示，不是背景系統推播。
+
+手機聊天視窗會單獨適應鍵盤高度，關閉鍵盤後回到完整 App 高度；不修改主畫面版的全螢幕高度計算。測試聊天寫入必須使用獨立 `QA_ORIGIN=http://127.0.0.1:8079`。
+
+安裝後使用全螢幕顯示模式（不支援時使用 standalone），頁面依實際可見高度分配頂欄、地圖與底部導覽列，系統安全區只計算一次。介面固定 1 倍縮放；雙指縮放、雙擊或 ＋／－ 只改變地圖比例，介面外的雙指縮放與頁面縮放快捷操作會攔截。手機輸入欄至少 16px，避免 Safari 聚焦時自動放大。作業系統的輔助放大功能不屬於網站可控制範圍。
+
+iPhone／iPad 主畫面模式（`navigator.standalone`）使用 `100vh` 作為完整 App 高度，CSS 載入前便設定，旋轉或返回時保持此規則，不把 `visualViewport.height` 寫成固定像素。WebKit 已記錄主畫面模式的可見高度少算安全區問題（[254868](https://bugs.webkit.org/show_bug.cgi?id=254868)）；一般瀏覽器與 Android 仍使用可見高度。回歸測試模擬少算 47px、縮放、鍵盤開關與旋轉，未取代 iOS 真機驗證。
+
+## Google 地圖設定
+
+將專案根目錄的 `google-maps.local.example.json` 複製為 `google-maps.local.json`，填入啟用 Maps JavaScript API 的瀏覽器金鑰：
+
+```json
+{"apiKey":"YOUR_GOOGLE_MAPS_API_KEY","language":"zh-TW","region":"JP"}
+```
+
+這個檔案已排除版本控制，也不會直接由網站提供下載。瀏覽器金鑰會透過不快取的 `/api/config` 傳給前端，因此必須在 Google Cloud 限制可用網站與 API。網站限制包含正式網址 `https://tamagoyaki-support.modoubletw.com/*`，以及開發使用的 `http://127.0.0.1:8078/*`、`http://localhost:8078/*`；API 限制選擇 Maps JavaScript API。此設定檔會在重新整理網站時讀取，不必重新啟動伺服器。
+
+底圖使用官方 Maps JavaScript API，保留 Google 署名，幕張場館覆蓋圖與一公里範圍沿用既有座標。金鑰缺失時使用 OpenStreetMap；Google 連線或授權失敗時會顯示提示並切回 OpenStreetMap。隔離 QA 伺服器可設定 `TAMAGO_MAP_PROVIDER=leaflet`，避免使用正式金鑰或依賴外部地圖授權。
+
+## 驗證
+
+任務類型包含「聚餐」。選取「求助」時須先取得 GPS，發布後以紅色驚嘆號顯示發布者的即時位置，求助所在遠征隊的所有成員皆可查看，不必接取；不會擴及其他遠征隊或僅有好友關係的人。求助持續到發布者按「刪除求助」，沒有一般任務的到期時間；多個求助須刪除最後一個才停止持續定位。切換隊伍與重新整理會恢復求助定位；定位暫時失效時保留最後位置 15 分鐘並重試；2–15 分鐘標示最後位置，滿 15 分鐘未更新後隱藏。拒絕權限會立即撤回座標，須手動開啟，退出該隊或登出也會撤回位置。既有未同意廣播的舊任務不會因更新擴大位置權限。
+
+帳號選單提供「全螢幕／加入主畫面」。支援 Fullscreen API 的瀏覽器可在點擊後進入全螢幕；iPhone／iPad 顯示 Safari 加入主畫面步驟，Android／電腦提供安裝引導與可用時的原生安裝提示。安裝後從主畫面啟動使用 `fullscreen`，不支援時回退至 `standalone`；已加入 iOS 網頁 App 設定與安全區留白。普通分頁不會自動強制全螢幕。服務工作者仍不快取私密 API 或地圖。參考 [MDN 安裝提示](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/How_to/Trigger_install_prompt)、[顯示模式](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Manifest/Reference/display)、[Fullscreen API](https://developer.mozilla.org/en-US/docs/Web/API/Element/requestFullscreen) 與 [Chrome 安裝網頁應用程式](https://support.google.com/chrome/answer/9658361?co=GENIE.Platform%3DAndroid&hl=zh-Hant)。
+
+地圖左上角可輸入地點名稱或地址，按「搜尋」後選取結果，再建立臨時地標或固定任務旗標。搜尋範圍包含台灣；範圍外的結果會自動關閉一公里限制。地點資料來自 OpenStreetMap／Photon，底圖仍使用原本的 Google Maps。搜尋只在使用者送出時執行，伺服器快取 24 小時、同時最多一個請求，且請求間隔至少 1.1 秒；不會將使用者 GPS 傳給搜尋服務。可用 `TAMAGO_PLACE_SEARCH_URL` 切換自架 Photon 的 `/api/` 位址。公開服務可能限流或暫時無法使用，錯誤時仍可長按地圖標記。參考 [Photon API](https://github.com/komoot/photon/blob/master/docs/api-v1.md) 與 [服務使用說明](https://github.com/komoot/photon#demo-server)。
+
+長按地圖約 0.6 秒（電腦也可按右鍵），可在選定位置插旗或建立臨時地標。旗標不隨發布者的 GPS 移動，座標仍只有接取者可見；臨時地標可選 2、6 或 24 小時。建立者與目前遠征隊的建立者（管理員／隊長）可刪除地標，伺服器會檢查權限。方向卡顯示在地圖左下側，位於定位設定卡下方。
+
+```powershell
+conda run -n agent python -m unittest test_app test_maps test_friends test_places test_assistance.AssistanceTest test_chat.ChatTest test_profiles.ProfilesTest test_expedition_admin.ExpeditionAdminTest -v
+npm ci --ignore-scripts
+# 在獨立 QA 資料庫的本機伺服器執行；勿對正式網址跑會寫入資料的測試
+$env:QA_ORIGIN = 'http://127.0.0.1:8079'
+npm run test:ui
+node scripts/friends-ui-test.mjs
+node scripts/location-audience-test.mjs
+node scripts/map-actions-test.mjs
+node scripts/place-search-test.mjs
+node scripts/assistance-test.mjs
+node scripts/app-display-test.mjs
+node scripts/app-viewport-test.mjs
+node scripts/ios-viewport-test.mjs
+node scripts/interface-zoom-test.mjs
+node scripts/background-location-test.mjs
+node scripts/chat-test.mjs
+node scripts/profiles-test.mjs
+node scripts/expedition-admin-test.mjs
+node scripts/country-venues-test.mjs
+node scripts/optional-date-test.mjs
+```
+
+後端測試自動使用臨時 SQLite。瀏覽器測試以本機 Edge 無頭模式執行，測試註冊、組隊、GPS、任務、地標與重新載入，並用第三個獨立瀏覽器驗證帳號資料取回、改密碼撤銷其他登入、修改暱稱與登出。桌面與手機畫面輸出到 `artifacts/`。`QA_CHROMIUM` 可覆寫測試瀏覽器路徑，`QA_ORIGIN` 可覆寫隔離 QA 來源。Node 依賴僅用於測試，應用程式本身不需要 Node 服務。
+
+## 公開來源
+
+Gemini 瀏覽器工具在本次工作連續逾時，因此研究來源由 Codex 直接核對，沒有使用 Gemini 回覆。
+
+- [Geolocation API](https://developer.mozilla.org/en-US/docs/Web/API/Geolocation_API)
+- [Leaflet 下載與 1.9.4 完整性雜湊](https://leafletjs.com/download.html)
+- [OpenStreetMap 圖磚政策](https://operations.osmfoundation.org/policies/tiles/)
+- [Google Maps JavaScript API 載入](https://developers.google.com/maps/documentation/javascript/load-maps-js-api)
+- [Google Maps 自訂覆蓋圖](https://developers.google.com/maps/documentation/javascript/customoverlays)
+- [Google Maps Content Security Policy](https://developers.google.com/maps/documentation/javascript/content-security-policy)
+- [Cloudflare 本機 Tunnel 與 DNS 路由](https://developers.cloudflare.com/tunnel/features/locally-managed-tunnels/create-local-tunnel/)
+- [OWASP 密碼儲存](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)
+- [OWASP 登入與驗證](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html)
+- [Argon2-cffi API](https://argon2-cffi.readthedocs.io/en/stable/api.html)
+
+Leaflet 授權保留在 `static/vendor/LEAFLET-LICENSE.txt`。
