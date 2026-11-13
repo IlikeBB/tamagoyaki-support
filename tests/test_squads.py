@@ -56,6 +56,7 @@ class SquadsTest(test_app.RendezvousTest):
         result=self.a.post(self.path+'/tasks',json={'title':'需要幫忙','kind':'help','lat':25.033,'lng':121.5654,'accuracy':10,'help_broadcast':True,'hours':6})
         self.assertEqual(result.status_code,200)
         squad=self.create(self.a,'求助期間的小隊')
+        self.assertEqual(self.a.put(self.path+'/location',json={'lat':25.034,'lng':121.56,'accuracy':8,'scope':'squad','squad_id':squad['id']}).status_code,409)
         self.assertEqual(self.a.delete(self.path+'/squads/'+squad['id']+'/membership').status_code,200)
         data=self.snapshot(self.b)
         member=next(person for person in data['members'] if person['user']==self.users[0]['id'])

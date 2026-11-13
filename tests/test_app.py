@@ -5,6 +5,7 @@ import os
 import tempfile
 import unittest
 import secrets
+from unittest import mock
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from fastapi.testclient import TestClient
@@ -173,7 +174,7 @@ class RendezvousTest(unittest.TestCase):
         with self.module.connect() as db:
             self.assertIsNone(db.execute("SELECT lat FROM members WHERE user=?",(self.users[0]["id"],)).fetchone()[0])
         self.assertEqual(self.a.put(self.path+'/location',json=location).status_code,409)
-        self.assertEqual(self.a.put(self.path+'/location',json={**location,'scope':'squad'}).status_code,422)
+        self.assertEqual(self.a.put(self.path+'/location',json={**location,'scope':'unknown'}).status_code,422)
         cancelled=self.make_task()
         cancelled_path=self.path+'/tasks/'+cancelled['id']
         self.assertEqual(self.b.post(cancelled_path+'/accept').status_code,200)
@@ -239,6 +240,82 @@ class RendezvousTest(unittest.TestCase):
             db.execute('UPDATE members SET located=? WHERE user=?',(self.module.now()-901,aid))
         self.assertFalse(member_for(self.b)['location_visible'])
         self.assertTrue(all(member_for(self.b)[key] is None for key in ('lat','lng','accuracy','located')))
+
+    def squad_pair(self):
+        self.assertEqual(self.a.post('/api/friends/requests',json={'username':self.usernames[1]}).status_code,200)
+        self.assertEqual(self.b.post('/api/friends/'+self.users[0]['id']+'/accept').status_code,200)
+        squad=self.a.post(self.path+'/squads',json={'name':'定位小隊'}).json()
+        self.assertEqual(self.b.post(self.path+'/squads/join',json={'code':squad['code']}).status_code,200)
+        return squad
+
+    def test_squad_location_is_exclusive_current_and_expires(self):
+        squad=self.squad_pair();aid=self.users[0]['id']
+        point={'lat':25.033,'lng':121.5654,'accuracy':8,'scope':'squad','squad_id':squad['id']}
+        member_for=lambda viewer:next(m for m in self.snapshot(viewer)['members'] if m['user']==aid)
+        self.a.post('/api/friends/requests',json={'username':self.usernames[3]})
+        self.outsider.post('/api/friends/'+aid+'/accept')
+        friend_for=lambda:next(f for f in self.outsider.get('/api/friends').json()['friends'] if f['id']==aid)
+        self.assertEqual(self.a.put('/api/friends/location',json={k:point[k] for k in ('lat','lng','accuracy')}).status_code,200)
+        self.assertTrue(friend_for()['location_visible'])
+        self.assertEqual(self.a.put(self.path+'/location',json=point).status_code,200)
+        self.assertFalse(friend_for()['location_visible'])
+        self.assertEqual(member_for(self.b)['scope'],'squad')
+        self.assertEqual(member_for(self.b)['lat'],point['lat'])
+        self.assertFalse(member_for(self.c)['location_visible'])
+        self.assertEqual(member_for(self.c)['scope'],'off')
+        self.assertTrue(all(member_for(self.c)[k] is None for k in ('lat','lng','accuracy','located')))
+        self.assertEqual(self.outsider.get(self.path).status_code,403)
+        self.assertEqual(self.c.put(self.path+'/location',json=point).status_code,409)
+        self.assertEqual(self.a.put(self.path+'/location',json={k:v for k,v in point.items() if k!='squad_id'}).status_code,409)
+        with self.module.connect() as db:
+            db.execute('UPDATE members SET located=? WHERE user=?',(self.module.now()-121,aid))
+        self.assertEqual(member_for(self.b)['location_status'],'last_known')
+        with self.module.connect() as db:
+            db.execute('UPDATE members SET located=? WHERE user=?',(self.module.now()-901,aid))
+        self.assertFalse(member_for(self.b)['location_visible'])
+        self.assertEqual(self.a.put(self.path+'/location',json=point).status_code,200)
+        self.b.post(self.path+'/squads',json={'name':'換一個小隊'})
+        self.assertFalse(member_for(self.b)['location_visible'])
+        self.b.post(self.path+'/squads/join',json={'code':squad['code']})
+        self.assertTrue(member_for(self.b)['location_visible'])
+        next_squad=self.a.post(self.path+'/squads',json={'name':'新的小隊'}).json()
+        self.assertFalse(member_for(self.b)['location_visible'])
+        self.assertEqual(self.a.put(self.path+'/location',json=point).status_code,409)
+        self.assertEqual(self.snapshot(self.a)['me']['scope'],'off')
+        self.assertEqual(self.a.put(self.path+'/location',json={**point,'squad_id':next_squad['id']}).status_code,200)
+        self.a.delete(self.path+'/squads/'+next_squad['id']+'/membership')
+        self.assertEqual(self.a.put(self.path+'/location',json={**point,'squad_id':next_squad['id']}).status_code,409)
+        self.assertEqual(self.snapshot(self.a)['me']['scope'],'off')
+
+    def test_squad_gps_never_leaks_through_task_to_outside_assignee(self):
+        squad=self.squad_pair();task=self.make_task();path=self.path+'/tasks/'+task['id']
+        self.c.post(path+'/accept')
+        self.a.put(self.path+'/location',json={'lat':25.033,'lng':121.5654,'accuracy':8,'scope':'squad','squad_id':squad['id']})
+        task_for=lambda viewer:next(t for t in self.snapshot(viewer)['tasks'] if t['id']==task['id'])
+        self.assertEqual(task_for(self.c)['location_source'],'published')
+        self.assertEqual(task_for(self.c)['lat'],task['lat'])
+        self.assertIsNone(task_for(self.b)['lat'])
+        self.assertEqual(task_for(self.a)['location_source'],'live')
+        self.c.post(path+'/release');self.b.post(path+'/accept')
+        self.assertEqual(task_for(self.b)['location_source'],'live')
+        self.assertEqual(task_for(self.b)['lat'],25.033)
+        self.b.post(self.path+'/squads',json={'name':'另一小隊'})
+        self.assertEqual(task_for(self.b)['location_source'],'published')
+        self.a.delete('/api/location')
+        self.assertEqual(self.snapshot(self.a)['me']['scope'],'off')
+
+    def test_squad_snapshot_rechecks_membership_after_initial_auth(self):
+        squad=self.squad_pair();aid=self.users[0]['id']
+        stale=self.snapshot(self.b)['me']
+        self.a.put(self.path+'/location',json={'lat':25.033,'lng':121.5654,'accuracy':8,'scope':'squad','squad_id':squad['id']})
+        self.b.post(self.path+'/squads',json={'name':'已切換的小隊'})
+        with mock.patch.object(self.module,'member',return_value=(self.users[1],stale)):
+            data=self.snapshot(self.b)
+        self.assertNotEqual(data['me']['squad'],squad['id'])
+        self.assertIsNone(next(m for m in data['members'] if m['user']==aid)['lat'])
+        self.b.delete(self.path+'/membership')
+        with mock.patch.object(self.module,'member',return_value=(self.users[1],stale)):
+            self.assertEqual(self.b.get(self.path).status_code,403)
 
     def test_venue_catalog_public_join_private_rooms_and_team_intelligence(self):
         private=self.a.post('/api/expeditions',json={'name':'邀請限定','venue':'makuhari','event_date':self.room['event_date'],'discoverable':False}).json()

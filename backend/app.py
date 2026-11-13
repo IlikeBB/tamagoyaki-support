@@ -303,7 +303,8 @@ class Position(Input):
 
 class Location(Position):
     accuracy: float = Field(ge=0, le=100000, allow_inf_nan=False)
-    scope: Literal["task", "expedition"]
+    scope: Literal["task", "expedition", "squad"]
+    squad_id: str | None = Field(default=None,min_length=1,max_length=64,pattern=r'^[A-Za-z0-9_-]+$')
 
 
 class TaskInput(Position):
@@ -482,7 +483,11 @@ def snapshot(eid: str, request: Request):
     u, mine = member(request, eid)
     stamp = now()
     with connect() as c:
-        c.execute("UPDATE members SET seen=? WHERE user=? AND expedition=?", (stamp, u["id"], eid))
+        changed=c.execute("UPDATE members SET seen=? WHERE user=? AND expedition=?", (stamp, u["id"], eid)).rowcount
+        if not changed:
+            raise HTTPException(403,'請先加入這支遠征隊。')
+        # Use the membership protected by this transaction, including squad changes.
+        mine=dict(c.execute('SELECT * FROM members WHERE user=? AND expedition=?',(u['id'],eid)).fetchone())
         room = dict(c.execute("SELECT * FROM expeditions WHERE id=?", (eid,)).fetchone())
         members = []
         help_positions=assistance.positions(c,eid)
@@ -494,7 +499,8 @@ def snapshot(eid: str, request: Request):
             private_positions[p['user']] = dict(p)
             p["online"] = p["seen"] >= stamp-40
             # Membership alone never opts a user into location sharing.
-            visible = (p['user'] != u['id'] and p['scope'] == 'expedition'
+            audience = p['scope']=='expedition' or (p['scope']=='squad' and mine['squad'] is not None and p['squad']==mine['squad'])
+            visible = (p['user'] != u['id'] and audience
                        and p['located'] is not None and p['located'] >= stamp-LOCATION_TTL_SECONDS)
             p['location_visible'] = visible
             help_point=help_positions.get(p['user'])
@@ -532,7 +538,8 @@ def snapshot(eid: str, request: Request):
                     task.update(lat=help_point['lat'],lng=help_point['lng'],accuracy=help_point['accuracy'],located=help_point['located'],location_source='help')
                 elif task['location_mode'] == 'fixed':
                     task.update(location_source='fixed',located=task['created'])
-                elif position and position['scope'] in ('task','expedition') and position['located'] is not None and position['located']>=stamp-LOCATION_TTL_SECONDS:
+                elif position and (position['scope'] in ('task','expedition') or
+                      position['scope']=='squad' and (task['owner']==u['id'] or mine['squad'] is not None and position['squad']==mine['squad'])) and position['located'] is not None and position['located']>=stamp-LOCATION_TTL_SECONDS:
                     task.update(lat=position['lat'],lng=position['lng'],accuracy=position['accuracy'],located=position['located'],location_source='live' if position['located']>=stamp-LIVE_SECONDS else 'last_known')
                 else:
                     task.update(location_source='published',located=task['created'])
@@ -601,10 +608,13 @@ def locate(eid: str, body: Location, request: Request):
     with connect() as c:
         c.execute('BEGIN IMMEDIATE')
         # Recheck membership inside the write transaction, including concurrent exits.
-        if not c.execute('SELECT 1 FROM members WHERE user=? AND expedition=?',(u['id'],eid)).fetchone():
+        current=c.execute('SELECT * FROM members WHERE user=? AND expedition=?',(u['id'],eid)).fetchone()
+        if not current:
             raise HTTPException(403,'請先加入這支遠征隊。')
         if assistance.required(c,u['id']):
             raise HTTPException(409,'求助期間須持續分享給求助所在遠征隊；請先刪除求助任務。')
+        if body.scope=='squad' and (not body.squad_id or current['squad']!=body.squad_id or not c.execute('SELECT 1 FROM squads WHERE id=? AND expedition=?',(body.squad_id,eid)).fetchone()):
+            raise HTTPException(409,'請先加入小隊；小隊變更後須重新開啟小隊定位分享。')
         active = c.execute("SELECT 1 FROM tasks WHERE expedition=? AND owner=? AND location_mode='publisher' AND status IN ('open','accepted') AND expires>? LIMIT 1",(eid,u['id'],now())).fetchone()
         if body.scope == 'task' and not active:
             raise HTTPException(409,'尚未發布進行中的任務，定位只需保留在本機。')

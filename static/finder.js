@@ -72,7 +72,7 @@ class TeammateFinder {
     this.select.value=this.selectedId||'';this.select.disabled=!m.ready||!m.tasks.length;
     this.root.querySelector('#finder-detail').hidden=!t;this.root.querySelector('#finder-empty').hidden=!!t;
     const emptyAction=this.root.querySelector('#finder-empty-action');emptyAction.hidden=!!t||!!m.tasks.length;
-    const message=m.guest?'登入後可加入好友，或加入遠征隊接取隊友任務，在這裡找人。':!m.ready?'等待重新同步，暫停顯示位置。':this.revoked?'對方已停止分享或任務已結束，請選擇其他對象。':m.tasks.length?'請選擇好友或你已接取的隊友任務。':'目前沒有可尋找的人。加入好友並請對方開啟分享，或接取隊友任務。';
+    const message=m.guest?'登入後可加入好友、小隊或遠征隊，在這裡找人。':!m.ready?'等待重新同步，暫停顯示位置。':this.revoked?'對方已停止分享或任務已結束，請選擇其他對象。':m.tasks.length?'請選擇已分享位置的好友、成員或已接任務。':'目前沒有可尋找的人。請好友或小隊成員開啟分享，或接取隊友任務。';
     this.text('finder-empty-message',message);emptyAction.textContent=m.guest?'選擇遠征隊':!m.ready?'重新同步':'查看好友';
     this.text('finder-summary',t?t.owner_name:'');
     if(!t){

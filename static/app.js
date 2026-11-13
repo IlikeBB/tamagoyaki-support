@@ -35,6 +35,7 @@ let map, layers, config, toastTimer, refreshing=false, lastSent=0, pollTimer;
 let pinRevision=0,taskRevision=0;
 const pendingPinDeletes=new Set();
 let locationGeneration=0, locationWrites=Promise.resolve(), gpsPending=false, lastPositionAt=0, lastPublishedSampleAt=0;
+let locationSquadId=null;
 let authIntent=null;
 let facilityLayer=null;
 let finder=null,lastTeamSyncAt=0;
@@ -65,8 +66,8 @@ function finderTasks(){
 }
 function expeditionPeople(){
   if(state.demo||!state.authenticated||!state.online||document.hidden||!lastTeamSyncAt||Date.now()-lastTeamSyncAt>20000)return [];
-  return state.members.filter(m=>m.user!==state.user.id&&m.location_visible&&m.scope==='expedition'&&Number.isFinite(m.lat)&&Number.isFinite(m.lng)&&LocationState.valid(m.located))
-    .map(m=>({...m,id:'member:'+m.user,owner:m.user,owner_name:m.nickname,title:'遠征隊 · '+state.room.name,kind:'member',location_source:m.help_shared?'help':'expedition'}));
+  return state.members.filter(m=>m.user!==state.user.id&&m.location_visible&&(m.scope==='expedition'||m.scope==='squad'&&!!state.mine.squad&&m.squad===state.mine.squad)&&Number.isFinite(m.lat)&&Number.isFinite(m.lng)&&LocationState.valid(m.located))
+    .map(m=>({...m,id:'member:'+m.user,owner:m.user,owner_name:m.nickname,title:m.scope==='squad'?'小隊 · '+(currentSquad()?.name||'同行小隊'):'遠征隊 · '+state.room.name,kind:'member',location_source:m.help_shared?'help':m.scope}));
 }
 function sharedPeople(){
   const seen=new Set();return [...(friends?.targets()||[]),...expeditionPeople()].filter(p=>{if(seen.has(p.owner))return false;seen.add(p.owner);return true;});
@@ -74,7 +75,7 @@ function sharedPeople(){
 function memberSharesLocation(member){
   if(member.user===state.user.id&&assistance?.active&&assistance.rooms.some(r=>r.id===state.room.id))return true;
   if(member.user!==state.user.id)return expeditionPeople().some(p=>p.owner===member.user);
-  return state.online&&state.mine.scope==='expedition'&&LocationState.valid(state.mine.located);
+  return state.online&&['expedition','squad'].includes(state.mine.scope)&&LocationState.valid(state.mine.located);
 }
 function navigationTargets(){return [...sharedPeople(),...finderTasks()];}
 function matchesPeopleFilter(person,value=peopleFilter){
@@ -310,7 +311,7 @@ function personMarker(t){
   const hasPosition=!!state.position&&LocationState.valid(lastPositionAt/1000),angle=hasPosition?bearing(state.position,t):null;
   const relation=t.kind==='friend'?'heart':t.kind==='member'?'users':null,stale=LocationState.lastKnown(t),ownStale=hasPosition&&LocationState.stale(lastPositionAt/1000);
   const symbol=relation?`<span class="teammate-map-relation">${icon(relation)}</span>`:esc([...(t.owner_name||'隊友')][0]);
-  const label=`${esc(t.owner_name)}${stale?` · 最後位置 · ${LocationState.age(t.located)}`:t.kind==='friend'?' · 好友':t.kind==='member'?' · 遠征隊':''}${ownStale?' · 方位估算':''}`;
+  const label=`${esc(t.owner_name)}${stale?` · 最後位置 · ${LocationState.age(t.located)}`:t.kind==='friend'?' · 好友':t.kind==='member'?t.location_source==='squad'?' · 小隊':' · 遠征隊':''}${ownStale?' · 方位估算':''}`;
   const html=MapPresence.render({kind:t.kind,angle,symbol,label,lastKnown:stale||ownStale});
   const guidance=angle===null?'取得你的位置後可顯示方位':`從你的位置往${direction(angle)}方向${ownStale?' · 依最後位置估算':''}`;
   marker(t,html,`${t.owner_name} · ${t.title} · ${guidance}`,()=>selectTarget(['friend','member'].includes(t.kind)?t.kind:'task',t.id));
@@ -330,7 +331,7 @@ function renderRadar(){
       chip.innerHTML=`<span class="radar-arrow-badge"><span class="radar-needle">${directionNeedle}</span></span><span class="radar-copy"><strong><span class="radar-relation-icon" aria-hidden="true">${t.kind==='friend'?icon('heart'):t.kind==='member'?icon('users'):''}</span><span class="radar-name"></span></strong><small><span class="radar-distance"></span><span class="radar-source"></span></small></span>`;
       root.append(chip);
     }
-    const d=(LocationState.stale(lastPositionAt/1000)||LocationState.lastKnown(t)?'約 ':'')+meters(distance(state.position,t)),source=LocationState.lastKnown(t)?`最後位置 · ${LocationState.age(t.located)}`:t.location_source==='help'?'求助':t.kind==='friend'?'好友':t.kind==='member'?'遠征隊':t.location_source==='fixed'?'任務旗標':t.location_source==='live'?'即時':'發布點';
+    const d=(LocationState.stale(lastPositionAt/1000)||LocationState.lastKnown(t)?'約 ':'')+meters(distance(state.position,t)),source=LocationState.lastKnown(t)?`最後位置 · ${LocationState.age(t.located)}`:t.location_source==='help'?'求助':t.kind==='friend'?'好友':t.kind==='member'?t.location_source==='squad'?'小隊':'遠征隊':t.location_source==='fixed'?'任務旗標':t.location_source==='live'?'即時':'發布點';
     chip.querySelector('.radar-name').textContent=t.owner_name;
     chip.classList.toggle('is-friend',t.kind==='friend');chip.classList.toggle('is-member',t.kind==='member');
     chip.querySelector('.radar-distance').textContent=d;chip.querySelector('.radar-source').textContent=source;
@@ -448,12 +449,12 @@ function renderLocation(){
   $('.location-card').classList.toggle('hidden',active&&locationCardDismissed);
   $('#location-dismiss').classList.toggle('hidden',!active);
   $('#location-reopen').classList.toggle('hidden',!active||!locationCardDismissed);
-  const labels={help:'求助中 · 全遠征隊可見',local:'僅供本機使用',friends:'僅與好友分享',expedition:'與目前遠征隊分享',task:'任務接取者限定'};
+  const labels={help:'求助中 · 全遠征隊可見',local:'僅供本機使用',friends:'僅與好友分享',expedition:'與目前遠征隊分享',squad:'僅與目前小隊分享',task:'任務接取者限定'};
   $('#location-title').textContent=active?'定位已開啟 · '+labels[state.scope]:'定位分享，由你決定。';
-  let detail='可選擇僅供本機、好友、遠征隊或任務接取者';
+  let detail='可選擇僅供本機、好友、小隊、遠征隊或任務接取者';
   if(active){
     if(state.position){
-      const audience={help:'持續分享至刪除求助任務',expedition:state.room.name,friends:'已接受邀請的好友可見',task:'有進行中的任務時提供即時位置',local:'即時位置不會上傳'};
+      const audience={help:'持續分享至刪除求助任務',expedition:state.room.name,squad:'僅「'+(currentSquad()?.name||'目前小隊')+'」成員可見',friends:'已接受邀請的好友可見',task:'有進行中的任務時提供即時位置',local:'即時位置不會上傳'};
       detail=LocationState.stale(lastPositionAt/1000)?`最後位置 · ${LocationState.age(lastPositionAt/1000)} · 未更新滿 15 分鐘後隱藏`:`精度 ±${Math.round(state.position.accuracy)}m · ${audience[state.scope]}`;
     }else detail=lastPositionAt&&!LocationState.valid(lastPositionAt/1000)?'超過 15 分鐘未更新，位置已隱藏；正在重新定位…':state.scope==='help'&&assistance?.error?'定位無法更新，請重試或刪除求助':'正在取得 GPS 定位…';
   }
@@ -511,7 +512,7 @@ function showJoin(mode='browse'){
   const options=activityVenues().map(v=>`<option value="${v.id}" ${v.id===activityVenue()?'selected':''}>${esc(v.name)}</option>`).join('');
   const tabs=`<div class="form-tabs"><button data-action="join-mode" class="${mode==='browse'?'active':''}">場館遠征隊</button><button data-action="create-mode" class="${mode==='create'?'active':''}">建立遠征隊</button><button data-action="code-mode" class="${mode==='code'?'active':''}">邀請碼</button></div>`;
   const title=mode==='create'?'號召同一場的夥伴。':mode==='code'?'用邀請碼加入。':'加入這一場的遠征隊。';
-  const intro=`<h2>${squadInvitation?'接受小隊邀請。':title}</h2><p>隊員彼此不會看到座標；大家都能發布任務，分享現場情報。</p>${squadInvitation?'<p class="field-note">僅限與小隊內目前成員互為好友的人加入。確認後會加入邀請的遠征隊及小隊；若已有其他分組，將切換小隊並關閉原有的遠征隊／任務定位分享。好友分享及求助定位不受影響。</p>':''}${tabs}`;
+  const intro=`<h2>${squadInvitation?'接受小隊邀請。':title}</h2><p>隊員彼此不會看到座標；大家都能發布任務，分享現場情報。</p>${squadInvitation?'<p class="field-note">僅限與小隊內目前成員互為好友的人加入。確認後會加入邀請的遠征隊及小隊；若已有其他分組，將切換小隊並關閉原有的小隊／遠征隊／任務定位分享。好友分享及求助定位不受影響。</p>':''}${tabs}`;
   if(mode==='browse'){
     dialog(`${intro}<label for="join-venue">選擇活動會場</label><select id="join-venue">${options}</select><div id="venue-catalog" aria-live="polite"><p class="field-note">正在載入遠征隊…</p></div><button class="button primary full" data-action="create-mode">＋ 建立這個場館的遠征隊</button>${!state.demo?`<button class="button outline full" data-action="manage-squads">遠征隊內的小隊組合</button>`:''}<button class="button outline full" data-action="owned-rooms">管理我建立的遠征隊</button>`);
     let generation=0;
@@ -575,6 +576,7 @@ async function refresh({fresh=false}={}){
     const data=await api(`/expeditions/${roomId}`);
     if(state.demo||state.room.id!==roomId||state.user.id!==userId)return;
     Object.assign(state,{room:data.room,members:data.members,tasks:tasksAtStart===taskRevision?data.tasks:state.tasks,pins:pinsAtStart===pinRevision?data.pins:state.pins,squads:data.squads,mine:data.me,online:true});lastTeamSyncAt=Date.now();
+    if(state.scope==='squad'&&data.me.squad!==locationSquadId){await stopLocation({remote:false});toast('小隊已變更，請重新選擇定位分享對象。');}
     assistance?.sync(data.help_rooms||[]);render();
   }catch(e){
     if(state.demo||state.room.id!==roomId||state.user.id!==userId)return;
@@ -600,7 +602,7 @@ function showRooms(){
 function showSquad(mode){
   if(state.demo)return showJoin();
   const create=mode==='create',roomId=state.room.id,userId=state.user.id;
-  dialog(`<h2>${create?'小隊集合！':'加入同行小隊。'}</h2><p>小隊僅限好友加入，需與其中一位目前成員互為好友。每人在同一遠征隊中同時加入一個小隊。建立或加入新小隊會切換分組，並關閉原有的遠征隊／任務定位分享；好友分享及求助定位不受影響。</p><form id="squad-form"><label for="squad-value">${create?'小隊名稱':'小隊邀請碼'}</label><input id="squad-value" name="value" required maxlength="${create?30:8}" ${create?'':'minlength="8" pattern="[A-Za-z0-9]{8}"'} placeholder="${create?'例如：玉子燒小隊':'8 位小隊邀請碼'}"><div class="form-error" role="alert"></div><button class="button primary full" type="submit">${create?'建立小隊':'加入小隊'}</button></form>`);
+  dialog(`<h2>${create?'小隊集合！':'加入同行小隊。'}</h2><p>小隊僅限好友加入，需與其中一位目前成員互為好友。每人在同一遠征隊中同時加入一個小隊。建立或加入新小隊會切換分組，並關閉原有的小隊／遠征隊／任務定位分享；好友分享及求助定位不受影響。</p><form id="squad-form"><label for="squad-value">${create?'小隊名稱':'小隊邀請碼'}</label><input id="squad-value" name="value" required maxlength="${create?30:8}" ${create?'':'minlength="8" pattern="[A-Za-z0-9]{8}"'} placeholder="${create?'例如：玉子燒小隊':'8 位小隊邀請碼'}"><div class="form-error" role="alert"></div><button class="button primary full" type="submit">${create?'建立小隊':'加入小隊'}</button></form>`);
   $('#squad-form').onsubmit=async e=>{e.preventDefault();await submit(e.target,async()=>{
     if(state.demo||state.room.id!==roomId||state.user.id!==userId)throw new Error('遠征隊已變更，請重新開啟小隊設定。');
     const value=new FormData(e.target).get('value');await stopTeamLocation();
@@ -710,16 +712,17 @@ function showPublish(type='task',point){
   };
 }
 function showHelpLocation(){
-  dialog(`<h2>求助定位分享中。</h2><p>只有發布求助的遠征隊成員能看到，持續至你刪除最後一個求助任務。求助期間無法切換為好友限定或本機定位。</p>${assistance.rooms.map(r=>`<button class="room-item" data-action="help-room" data-id="${esc(r.id)}"><span><strong>${esc(r.name)}</strong><small>${r.tasks} 個求助 · 前往刪除求助任務</small></span>${icon('chevron')}</button>`).join('')}<p class="field-note">切到背景時不會主動停止求助定位；最後位置保留 15 分鐘，超過 2 分鐘會標示更新時間。手機系統可能暫停背景 GPS；回到網頁會重新定位。</p>${assistance.error?'<button class="button primary full" data-action="help-retry">重新開啟求助定位</button>':''}<button class="button outline full" data-action="close">關閉設定，維持求助</button>`);
+  dialog(`<h2>求助定位分享中。</h2><p>只有發布求助的遠征隊成員能看到，持續至你刪除最後一個求助任務。求助期間無法切換為小隊、好友限定或本機定位。</p>${assistance.rooms.map(r=>`<button class="room-item" data-action="help-room" data-id="${esc(r.id)}"><span><strong>${esc(r.name)}</strong><small>${r.tasks} 個求助 · 前往刪除求助任務</small></span>${icon('chevron')}</button>`).join('')}<p class="field-note">切到背景時不會主動停止求助定位；最後位置保留 15 分鐘，超過 2 分鐘會標示更新時間。手機系統可能暫停背景 GPS；回到網頁會重新定位。</p>${assistance.error?'<button class="button primary full" data-action="help-retry">重新開啟求助定位</button>':''}<button class="button outline full" data-action="close">關閉設定，維持求助</button>`);
 }
 function showLocation(options={}){
   if(assistance?.active)return showHelpLocation();
   locationCardDismissed=false;renderLocation();
-  const active=state.scope!=='off',joined=state.authenticated&&!state.demo&&!!state.room?.id;
+  const active=state.scope!=='off',joined=state.authenticated&&!state.demo&&!!state.room?.id,squad=joined?currentSquad():null;
   const selected=options.friends?'friends':active?state.scope:joined?'task':'local';
   const choices=[
     ['local','僅供本機使用','在自己的地圖計算方向與距離，不上傳即時位置。',false],
     ['friends','只給好友','已互相接受邀請的好友可查看，不必加入同一隊伍。',!state.authenticated],
+    ['squad','只給小隊',squad?`只有「${squad.name}」的目前成員可查看；離開或切換小隊後停止分享。`:'先加入小隊，才能選擇此項。',!squad],
     ['expedition','只給目前遠征隊',joined?`「${state.room.name}」的所有成員可查看。`:'先加入遠征隊，才能選擇此項。',!joined],
     ['task','只給任務接取者','只有接取你進行中任務的人，可查看即時位置。',!joined]
   ];
@@ -728,24 +731,29 @@ function showLocation(options={}){
     event.preventDefault();await submit(event.target,async()=>{
       if(!navigator.geolocation)throw new Error('這個瀏覽器不支援定位。');
       const scope=new FormData(event.target).get('scope');
-      if(!['local','friends','expedition','task'].includes(scope))throw new Error('請選擇分享對象。');
+      if(!['local','friends','squad','expedition','task'].includes(scope))throw new Error('請選擇分享對象。');
       if(scope!=='local'&&!state.authenticated)throw new Error('請先登入帳號。');
-      if(['expedition','task'].includes(scope)&&!joined)throw new Error('請先加入遠征隊。');
-      await stopLocation({revoke:true});state.scope=scope;lastSent=0;const generation=locationGeneration;
+      if(['expedition','squad','task'].includes(scope)&&!joined)throw new Error('請先加入遠征隊。');
+      if(scope==='squad'&&(!squad||currentSquad()?.id!==squad.id))throw new Error('小隊已變更，請重新開啟定位設定。');
+      const roomId=state.room?.id,userId=state.user.id;
+      await stopLocation({revoke:true});
+      if(state.room?.id!==roomId||state.user.id!==userId||scope==='squad'&&currentSquad()?.id!==squad.id)throw new Error('隊伍已變更，請重新開啟定位設定。');
+      state.scope=scope;locationSquadId=scope==='squad'?squad.id:null;lastSent=0;const generation=locationGeneration;
       friends.sharing=scope==='friends';friends.lastSent=0;
       state.watch=navigator.geolocation.watchPosition(p=>receivePosition(p,generation),error=>locationError(error,generation),{enableHighAccuracy:true,maximumAge:5000,timeout:20000});
-      closeDialog();renderLocation();if(state.tab==='friends')renderPanel();toast('正在取得你的位置 · '+{local:'僅供本機使用',friends:'只與好友分享',expedition:'只與目前遠征隊分享',task:'僅供任務接取者使用'}[scope]);
+      closeDialog();renderLocation();if(state.tab==='friends')renderPanel();toast('正在取得你的位置 · '+{local:'僅供本機使用',friends:'只與好友分享',squad:'只與目前小隊分享',expedition:'只與目前遠征隊分享',task:'僅供任務接取者使用'}[scope]);
     });
   };
 }
-async function stopLocation({revoke=false,keepHelp=false,preservePosition=false}={}){
+async function stopLocation({revoke=false,keepHelp=false,preservePosition=false,remote=true}={}){
   if(!preservePosition){locationCardDismissed=false;centerOnLocationFix=true;}
   locationGeneration++;
+  locationSquadId=null;
   lastPublishedSampleAt=0;
   if(state.watch!=null)navigator.geolocation.clearWatch(state.watch);state.watch=null;const was=state.scope!=='off';state.scope='off';
   const shared=was||friends?.sharing||friends?.data.sharing||state.mine.scope!=='off';
-  await locationWrites.catch(()=>{});await friends?.stop({remote:false});
-  try{if(!keepHelp&&state.authenticated&&(shared||revoke))await api('/location','DELETE');}
+  if(remote)await locationWrites.catch(()=>{});await friends?.stop({remote:false});
+  try{if(remote&&!keepHelp&&state.authenticated&&(shared||revoke))await api('/location','DELETE');}
   finally{if(!preservePosition)state.position=null;renderLocation();renderMap();}
 }
 async function stopTeamLocation(){
@@ -771,13 +779,15 @@ function receivePosition(p,generation){
   }
   renderLocation();renderMap();
   friends?.publish(state.position,p.timestamp);
-  if(state.demo||!['task','expedition'].includes(state.scope))return;
+  if(state.demo||!['task','expedition','squad'].includes(state.scope))return;
+  if(state.scope==='squad'&&(!locationSquadId||state.mine.squad!==locationSquadId))return;
   if(state.scope==='task'&&!state.tasks.some(t=>t.owner===state.user.id&&t.location_mode!=='fixed'&&['open','accepted'].includes(t.status)&&t.expires>Date.now()/1000))return;
   if(p.timestamp<=lastPublishedSampleAt||Date.now()-lastSent<4000)return;
-  lastSent=Date.now();lastPublishedSampleAt=p.timestamp;const eid=state.room.id,position={...state.position},scope=state.scope;
+  lastSent=Date.now();lastPublishedSampleAt=p.timestamp;const eid=state.room.id,position={...state.position},scope=state.scope,squadId=locationSquadId;
   locationWrites=locationWrites.catch(()=>{}).then(async()=>{
     if(generation!==locationGeneration||state.scope!==scope||state.demo||state.room.id!==eid||Date.now()-p.timestamp>20000)return;
-    try{await api(`/expeditions/${eid}/location`,'PUT',{...position,scope});if(generation===locationGeneration)await refresh();}catch(error){toast(error.message);}
+    if(scope==='squad'&&state.mine.squad!==squadId)return;
+    try{await api(`/expeditions/${eid}/location`,'PUT',{...position,scope,...(scope==='squad'?{squad_id:squadId}:{})});if(generation===locationGeneration)await refresh();}catch(error){toast(error.message);if(scope==='squad'&&error.status===409&&generation===locationGeneration)await refresh();}
   });
 }
 async function locationError(error,generation){
@@ -819,7 +829,7 @@ async function taskAction(id,action){
   }catch(e){toast(e.message);}finally{state.pending=false;}
 }
 function help(){
-  dialog(`<h2>和熟悉的人，一起會合。</h2><ol class="help-list"><li><strong>定位分享：</strong>在「定位設定」選擇僅供本機、只給好友、只給目前遠征隊或只給任務接取者；一次只分享給一種對象。</li><li><strong>加入好友：</strong>到「好友」輸入對方帳號，雙方接受後即可選擇與好友分享，不必加入隊伍。</li><li><strong>選擇遠征隊：</strong>登入後，在場館列表加入隊伍。只有主動開啟隊伍分享的人，才會在隊伍地圖顯示位置。</li><li><strong>一般任務：</strong>記錄目前位置，任務發布點只有接取者能取得。停止即時定位不會移除發布點，撤回任務可停止提供。</li><li><strong>發布求助：</strong>須允許 GPS，位置會分享給求助所在遠征隊的所有成員，地圖顯示紅色驚嘆號；刪除最後一個求助後才停止持續分享。</li><li><strong>前往會合：</strong>好友、已分享位置的遠征隊成員及已接任務，都可在尋人視窗查看方向與直線距離。</li><li><strong>左側篩選：</strong>碰觸地圖左邊緣，選擇所有人、好友、遠征隊成員或同小隊隊友。</li><li><strong>長按地圖：</strong>在選定位置插旗發布任務，或建立限時／永久地標。也可按地圖右側地標按鈕選擇地圖中心。</li><li><strong>管理情報點：</strong>為同隊夥伴標記攤位、配布、洗手間或集合點；只有建立者或管理員（遠征隊隊長）能刪除。</li></ol><p class="field-note">切換分享對象會先撤回原本的即時位置。停止定位或登出會立即撤回即時座標。超過 2 分鐘未更新會標示「最後位置」，滿 15 分鐘未更新後隱藏。情報點與任務發布點依原本權限保留。</p><p class="field-note">網頁不能跨其他 App 懸浮；切到背景會保留最後位置 15 分鐘，手機系統可能暫停 GPS 更新；回到網頁會重新定位。距離是直線距離，室內 GPS 可能不準確。可用「1 km 範圍」開關切換場館周邊與不限範圍。</p><button class="button primary full" data-action="close">知道了 ${icon('arrow')}</button>`);
+  dialog(`<h2>和熟悉的人，一起會合。</h2><ol class="help-list"><li><strong>定位分享：</strong>在「定位設定」選擇僅供本機、只給好友、只給小隊、只給目前遠征隊或只給任務接取者；一次只分享給一種對象。</li><li><strong>加入好友：</strong>到「好友」輸入對方帳號，雙方接受後即可選擇與好友分享，不必加入隊伍。</li><li><strong>選擇遠征隊：</strong>登入後，在場館列表加入隊伍。只有主動開啟隊伍分享的人，才會在隊伍地圖顯示位置。</li><li><strong>一般任務：</strong>記錄目前位置，任務發布點只有接取者能取得。停止即時定位不會移除發布點，撤回任務可停止提供。</li><li><strong>發布求助：</strong>須允許 GPS，位置會分享給求助所在遠征隊的所有成員，地圖顯示紅色驚嘆號；刪除最後一個求助後才停止持續分享。</li><li><strong>前往會合：</strong>好友、已分享位置的遠征隊成員及已接任務，都可在尋人視窗查看方向與直線距離。</li><li><strong>左側篩選：</strong>碰觸地圖左邊緣，選擇所有人、好友、遠征隊成員或同小隊隊友。</li><li><strong>長按地圖：</strong>在選定位置插旗發布任務，或建立限時／永久地標。也可按地圖右側地標按鈕選擇地圖中心。</li><li><strong>管理情報點：</strong>為同隊夥伴標記攤位、配布、洗手間或集合點；只有建立者或管理員（遠征隊隊長）能刪除。</li></ol><p class="field-note">切換分享對象會先撤回原本的即時位置。停止定位或登出會立即撤回即時座標。超過 2 分鐘未更新會標示「最後位置」，滿 15 分鐘未更新後隱藏。情報點與任務發布點依原本權限保留。</p><p class="field-note">網頁不能跨其他 App 懸浮；切到背景會保留最後位置 15 分鐘，手機系統可能暫停 GPS 更新；回到網頁會重新定位。距離是直線距離，室內 GPS 可能不準確。可用「1 km 範圍」開關切換場館周邊與不限範圍。</p><button class="button primary full" data-action="close">知道了 ${icon('arrow')}</button>`);
 }
 document.addEventListener('click',async e=>{
   const b=e.target.closest('button');if(!b)return;
