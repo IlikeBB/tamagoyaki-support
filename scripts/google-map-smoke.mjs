@@ -22,9 +22,9 @@ try{
   await expect(page.locator('#map img[alt="Google"]')).toBeVisible();
   await expect.poll(()=>page.locator('.google-facility-overlay').evaluate(el=>el.complete&&el.naturalWidth>0),{timeout:15000}).toBe(true);
   const geometry=await page.evaluate(()=>({center:map.getCenter(),radius:map.radius,minimum:map.getMinZoom(),zoom:map.getZoom(),circle:layers.items.find(x=>x instanceof google.maps.Circle)?.getRadius()}));
-  expect(geometry.radius).toBe(1000);expect(geometry.circle).toBe(1000);
+  expect(geometry.radius).toBeUndefined();expect(geometry.circle).toBeUndefined();expect(geometry.minimum).toBe(2);
   expect(geometry.center.lat).toBeCloseTo(35.6483,3);expect(geometry.center.lng).toBeCloseTo(140.0346,3);
-  checks.push('Native Google raster tiles, attribution, 1 km boundary and venue overlay loaded');
+  checks.push('Native Google raster tiles, attribution, unrestricted map and venue overlay loaded');
   await page.screenshot({path:'artifacts/google-desktop.png'});
   const initialZoom=await page.evaluate(()=>map.getZoom());
   await page.locator('[data-action=zoom-in]').click();
@@ -32,7 +32,7 @@ try{
   const desktopOverlay=await page.locator('.google-facility-overlay').boundingBox();
   expect(desktopOverlay.width).toBeGreaterThan(100);
   await page.evaluate(()=>{
-    state.pins=[{id:'google-map-ui-fixture',title:'地圖情報點測試',kind:'booth',lat:35.6485,lng:140.0349}];renderMap();
+    state.pins=[{id:'google-map-ui-fixture',title:'地圖情報點測試',kind:'booth',following_author:true,lat:35.6485,lng:140.0349}];renderMap();
   });
   await page.locator('.google-custom-marker[aria-label="地圖情報點測試"]').click();
   await expect(page.locator('#target-card')).toContainText('地圖情報點測試');
@@ -43,7 +43,7 @@ try{
   await expect.poll(()=>page.evaluate(()=>map.element.clientWidth)).toBe(390);
   await page.evaluate(()=>new Promise(resolve=>{
     google.maps.event.addListenerOnce(map.native,'idle',resolve);
-    map.focusRegion(venue(),1000);setTimeout(resolve,4000);
+    focusVenue();setTimeout(resolve,4000);
   }));
   await expect(page.locator('.google-facility-overlay')).toBeVisible();
   await page.locator('#finder-launcher').click();
@@ -63,7 +63,7 @@ try{
   await page.setViewportSize({width:320,height:568});
   await page.evaluate(()=>new Promise(resolve=>{
     google.maps.event.addListenerOnce(map.native,'idle',resolve);
-    map.focusRegion(venue(),1000);setTimeout(resolve,4000);
+    focusVenue();setTimeout(resolve,4000);
   }));
   const controls=await page.locator('.map-tools').boundingBox();
   const banner=await page.locator('#demo-banner').boundingBox();
@@ -76,7 +76,7 @@ try{
   // Auth failure after SDK load must keep the app usable and visibly report fallback.
   await page.evaluate(()=>window.gm_authFailure());
   await expect(page.locator('#map-provider-notice')).toBeVisible();
-  await expect(page.locator('.region-boundary')).toBeVisible();
+  await expect(page.locator('.region-boundary,.region-mask')).toHaveCount(0);
   await expect(page.locator('.facility-overlay')).toBeVisible();
   checks.push('Late Google authorization failure restores the fallback map and venue overlay');
   expect(errors).toEqual([]);

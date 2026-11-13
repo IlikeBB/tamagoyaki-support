@@ -25,7 +25,7 @@ try{
  }
  await publish('需要協助 '+suffix);
  let snapshot=await (await a.context.request.get(origin+path)).json();const first=snapshot.tasks.find(t=>t.help_active);expect(first.location_source).toBe('help');expect(first.status).toBe('open');
- await b.page.evaluate(()=>refresh());await b.page.locator('#region-toggle').click();await expect(b.page.locator('.help-map-marker')).toHaveCount(1);await b.page.evaluate(id=>selectTarget('task',id),first.id);await expect(b.page.locator('#finder-source')).toHaveText('求助即時位置 · 全遠征隊可見');await b.page.locator('#finder-close').click();await b.page.locator('.help-map-marker').click();await b.page.locator('#finder-close').click();await b.page.screenshot({path:'artifacts/help-red-marker-mobile.png'});
+ await b.page.evaluate(()=>refresh());await expect(b.page.locator('.help-map-marker')).toHaveCount(1);await b.page.evaluate(id=>selectTarget('task',id),first.id);await expect(b.page.locator('#finder-source')).toHaveText('求助即時位置 · 全遠征隊可見');await b.page.locator('#finder-close').click();await b.page.locator('.help-map-marker').click();await b.page.locator('#finder-close').click();await b.page.screenshot({path:'artifacts/help-red-marker-mobile.png'});
  await c.page.evaluate(()=>refresh());await expect(c.page.locator('.help-map-marker')).toHaveCount(0);
  const otherSnapshot=await (await c.context.request.get(origin+'/api/expeditions/'+other.id)).json();expect(otherSnapshot.members.find(m=>m.user===a.user.id).lat).toBeNull();
  checks.push('choosing help requires GPS; publication immediately broadcasts to all members of its own room; another joined room cannot see it; red exclamation marker opens live finder without acceptance');

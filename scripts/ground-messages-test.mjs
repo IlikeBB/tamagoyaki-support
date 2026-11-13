@@ -22,12 +22,12 @@ try{
  const pin=(await api(b,path)).pins.find(p=>p.kind==='message');expect(pin.lat).toBe(25.033);expect(pin.lng).toBe(121.5654);expect(pin.description).toBe(text);expect(pin.expires-pin.created).toBe(86400);
  await expect(b.page.locator('.ground-message-marker')).toHaveCount(1);await expect(b.page.locator('.ground-message-copy')).toHaveText(text);await expect(b.page.locator('.ground-message-copy img,.ground-message-copy script')).toHaveCount(0);
  expect(await b.page.evaluate(()=>window.noteInjected)).toBeUndefined();expect(await b.page.evaluate(()=>state.watch)).toBeNull();expect(await b.page.evaluate(()=>state.scope)).toBe('off');
- expect((await api(b,path)).members.find(m=>m.user===b.user.id).lat).toBeNull();expect((await api(b,'/friends')).sharing).toBe(false);await expect(b.page.locator('#region-toggle')).toHaveAttribute('aria-pressed','false');
+ expect((await api(b,path)).members.find(m=>m.user===b.user.id).lat).toBeNull();expect((await api(b,'/friends')).sharing).toBe(false);await expect(b.page.locator('#region-toggle')).toHaveCount(0);
  checks.push('creation menu entry removed; retained component uses current Taiwan GPS, creates a fixed note without live sharing, and keeps text safe');
  await b.context.setGeolocation({latitude:25.04,longitude:121.57,accuracy:10});expect((await api(b,path)).pins[0].lat).toBe(25.033);
  await c.page.evaluate(()=>refresh());await c.page.locator('.mobile-tabs [data-tab=pins]').click();await c.page.locator(`[data-action=pin-target][data-id="${pin.id}"]`).click();
  // A member can read the shared point after expanding the venue region.
- if(await c.page.locator('#region-toggle').getAttribute('aria-pressed')==='true')await c.page.locator('#region-toggle').click();
+ await expect(c.page.locator('#region-toggle')).toHaveCount(0);
  await c.page.locator('.mobile-tabs [data-tab=pins]').click();await c.page.locator(`[data-action=pin-target][data-id="${pin.id}"]`).click();
  await c.page.locator('#target-card [data-action=target-close]').click();await c.page.locator('.ground-message-marker').click();await expect(c.page.locator('.ground-message-copy')).toHaveText(text);
  await expect(c.page.locator(`[data-action=delete-pin][data-id="${pin.id}"]`)).toHaveCount(0);await expect(c.page.locator('#target-card [data-action=pin-vote][data-value="1"]')).toBeEnabled();

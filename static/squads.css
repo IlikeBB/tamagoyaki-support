@@ -10,9 +10,12 @@
 .squad-group-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
 .squad-group-heading h3{font-size:13px;margin:0;overflow-wrap:anywhere}
 .squad-group-heading>span{font-size:10px;color:var(--green);white-space:nowrap}
-.squad-people{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
-.squad-person{display:inline-flex;align-items:center;gap:6px;max-width:100%;min-width:0}
-.squad-person>span{font-size:11px;max-width:100px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.squad-people{display:grid;gap:8px;margin:12px 0}
+.squad-person{display:flex;align-items:center;gap:10px;min-width:0;padding:6px 0}
+.squad-person .profile-avatar{flex-shrink:0}
+.squad-person-info{min-width:0;flex:1}
+.squad-person-info strong{display:block;font-size:12px;font-weight:600;overflow-wrap:anywhere}
+.squad-person-info small{display:block;font-size:10px;font-weight:400;color:var(--muted);margin-top:2px}
 .squad-group-actions{display:flex;flex-wrap:wrap;gap:12px;border-top:1px solid var(--line);padding-top:8px;margin-top:12px}
 .squad-group-actions button{min-height:36px;padding:4px 0;font-size:11px;color:var(--green)}
 .squad-group-actions [data-action=leave-squad]{color:var(--orange)}

@@ -24,7 +24,7 @@ try{
   const gesture=new Event('gesturechange',{bubbles:true,cancelable:true});document.querySelector('#map').dispatchEvent(gesture);
   return {wheel:wheel.defaultPrevented,key:key.defaultPrevented,gesture:gesture.defaultPrevented};
  });expect(defaults).toEqual({wheel:true,key:true,gesture:true});checks.push('pinch outside map keeps viewport at 1×; browser zoom wheel/shortcut and native WebKit gesture defaults suppressed');
- await page.locator('#region-toggle').click();await page.evaluate(()=>map.setView([25.033,121.5654],16));
+ await page.evaluate(()=>map.setView([25.033,121.5654],16));
  const rect=await page.locator('#map').boundingBox(),x=rect.x+rect.width/2,y=rect.y+rect.height*.5;
  const zoom=await page.evaluate(()=>map.getZoom());await pinch(x,y,25,90);await expect.poll(()=>page.evaluate(()=>map.getZoom()),{timeout:7000}).toBeGreaterThan(zoom);expect(await page.evaluate(()=>visualViewport.scale)).toBe(1);
  const inZoom=await page.evaluate(()=>map.getZoom());await pinch(x,y,90,25);await expect.poll(()=>page.evaluate(()=>map.getZoom()),{timeout:7000}).toBeLessThan(inZoom);expect(await page.evaluate(()=>visualViewport.scale)).toBe(1);

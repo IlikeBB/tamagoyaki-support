@@ -26,7 +26,7 @@ try{
  },{point});
  await page.locator('#place-query').fill('台北101');await page.waitForTimeout(350);expect(await page.evaluate(()=>qaQueries)).toEqual([]);
  await page.locator('#place-search [type=submit]').click();await expect(page.locator('.place-search-result')).toHaveCount(1);await expect(page.locator('#place-search-panel img')).toHaveCount(0);await expect(page.locator('.place-provider')).toHaveText('供應者 <img src=x>');await expect(page.locator('.place-provider a')).toHaveCount(0);await expect(page.locator('.place-search-credit')).toHaveText('Google Maps');
- await page.locator('.place-search-result').click();await expect(page.locator('#region-toggle')).toHaveAttribute('aria-pressed','false');await expect(page.locator('.search-result-marker')).toHaveCount(1);
+ await page.locator('.place-search-result').click();await expect(page.locator('#region-toggle')).toHaveCount(0);await expect(page.locator('.search-result-marker')).toHaveCount(1);
  expect(await page.evaluate(()=>map.getCenter().lat)).toBeCloseTo(point.lat,4);
  await expect(page.locator('[data-place-create=pin]')).toBeVisible();await page.screenshot({path:'artifacts/place-search-mobile.png'});
  await page.locator('[data-place-close]').click();await expect(page.locator('#place-search-panel')).toBeHidden();await expect(page.locator('#place-query')).toBeFocused();

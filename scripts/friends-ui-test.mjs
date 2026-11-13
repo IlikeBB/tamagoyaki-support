@@ -16,7 +16,7 @@ async function person(label,lat,lng){
  await page.goto(origin);await expect.poll(()=>page.evaluate(()=>state.authenticated&&friends?.ready()),{timeout:15000}).toBe(true);
  return {page,user,username};
 }
-async function friendsPage(page){await page.locator('.mobile-tabs [data-tab=friends]').click();await page.evaluate(()=>friends.sync());}
+async function friendsPage(page){await page.locator('[data-action=friends-preview]').click();await page.evaluate(()=>friends.sync());}
 async function gps(page,share){
  await page.evaluate(()=>showLocation());await page.locator('#location-scope-'+(share?'friends':'local')).check();await page.locator('#location-form [type=submit]').click();
  await expect.poll(()=>page.evaluate(()=>!!state.position)).toBe(true);await page.evaluate(()=>friends.writes);
@@ -34,7 +34,7 @@ try{
  await a.page.evaluate(()=>friends.sync());await a.page.locator('#friend-share-toggle').click();await expect(a.page.locator('#location-scope-friends')).toBeChecked();
  await a.page.locator('#location-form [type=submit]').click();await expect.poll(()=>a.page.evaluate(()=>!!state.position)).toBe(true);await a.page.evaluate(()=>friends.writes);
  await friendsPage(b.page);await b.page.locator('[data-action=friend-find]').click();
- await expect(b.page.locator('#region-toggle')).toHaveAttribute('aria-pressed','false');
+ await expect(b.page.locator('#region-toggle')).toHaveCount(0);
  await markerCount(b.page,1);await expect(b.page.locator('#finder-name')).toHaveText('小狐 <img src=x>');await expect(b.page.locator('#finder-source')).toContainText('好友即時位置');
  await expect(b.page.locator('.teammate-map-point img')).toHaveCount(0);await b.page.locator('#finder-close').click();
  await gps(b.page,false);await expect(b.page.locator('.radar-chip')).toHaveCount(1);await expect(b.page.locator('.friend-map-point .presence-fan svg')).toHaveCount(1);

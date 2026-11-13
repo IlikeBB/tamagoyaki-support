@@ -45,7 +45,7 @@ window.TamagoGoogleMap = (() => {
         img.alt=this.options.alt;img.className='facility-overlay google-facility-overlay';
         img.style.opacity=this.options.opacity;img.draggable=false;
         img.onerror=()=>this.handlers.error?.();this.element=img;
-        // Below native polygons, so the 1 km mask also clips the venue overlay.
+        // Venue artwork stays below application markers.
         this.getPanes().mapPane.append(img);
       }
       draw(){
@@ -78,13 +78,13 @@ window.TamagoGoogleMap = (() => {
 
   class MapView {
     constructor(id){
-      this.isGoogle=true;this.element=document.getElementById(id);this.minimum=0;
+      this.isGoogle=true;this.element=document.getElementById(id);this.minimum=2;
       this.native=new google.maps.Map(this.element,{
-        center:{lat:35.6483,lng:140.0346},zoom:16,maxZoom:20,
+        center:{lat:35.6483,lng:140.0346},zoom:16,minZoom:2,maxZoom:20,
         mapTypeId:'roadmap',renderingType:google.maps.RenderingType.RASTER,
         isFractionalZoomEnabled:true,disableDefaultUI:true,clickableIcons:false,
         gestureHandling:'greedy',keyboardShortcuts:true,tilt:0,
-        styles:[{featureType:'poi',elementType:'labels',stylers:[{visibility:'off'}]}]
+        styles:TamagoTheme.googleStyles()
       });
       this.classes=overlayClasses();
       class Projection extends google.maps.OverlayView {onAdd(){} draw(){} onRemove(){}}
@@ -97,33 +97,7 @@ window.TamagoGoogleMap = (() => {
       else this.native.addListener(name,e=>handler({latlng:e?.latLng?.toJSON()}));
       return this;
     }
-    focusRegion(center,radius){
-      this.center=literal(center);this.radius=radius;
-      const latDelta=radius/6371000*180/Math.PI,lngDelta=latDelta/Math.cos(center.lat*Math.PI/180);
-      const bounds={south:center.lat-latDelta,north:center.lat+latDelta,west:center.lng-lngDelta,east:center.lng+lngDelta};
-      const width=Math.max(this.element.clientWidth,1),height=Math.max(this.element.clientHeight,1);
-      const mercator=lat=>Math.log(Math.tan(Math.PI/4+lat*Math.PI/360));
-      const fractionX=(bounds.east-bounds.west)/360;
-      const fractionY=(mercator(bounds.north)-mercator(bounds.south))/(2*Math.PI);
-      this.minimum=Math.min(Math.log2(width/(256*fractionX)),Math.log2(height/(256*fractionY)));
-      this.native.setOptions({restriction:null,minZoom:0});
-      this.native.setCenter(this.center);this.native.setZoom(this.minimum);
-      this.native.setOptions({minZoom:this.minimum,restriction:{latLngBounds:bounds,strictBounds:false}});
-    }
-    drawRegion(center,radius,group){
-      const r=Math.PI/180,phi=center.lat*r,lambda=center.lng*r,d=radius/6371000,ring=[];
-      for(let i=0;i<96;i++){
-        const theta=2*Math.PI*i/96;
-        const lat=Math.asin(Math.sin(phi)*Math.cos(d)+Math.cos(phi)*Math.sin(d)*Math.cos(theta));
-        const lng=lambda+Math.atan2(Math.sin(theta)*Math.sin(d)*Math.cos(phi),Math.cos(d)-Math.sin(phi)*Math.sin(lat));
-        ring.push({lat:lat/r,lng:lng/r});
-      }
-      const latDelta=12*radius/6371000/r,lngDelta=latDelta/Math.cos(phi);
-      const outer=[{lat:center.lat-latDelta,lng:center.lng-lngDelta},{lat:center.lat+latDelta,lng:center.lng-lngDelta},{lat:center.lat+latDelta,lng:center.lng+lngDelta},{lat:center.lat-latDelta,lng:center.lng+lngDelta}];
-      group.add(new google.maps.Polygon({paths:[outer,ring.reverse()],strokeWeight:0,fillColor:'#faf8f2',fillOpacity:1,clickable:false,zIndex:10}));
-      group.add(new google.maps.Circle({center:literal(center),radius,strokeColor:'#71846c',strokeWeight:1,fillOpacity:0,clickable:false,zIndex:11}));
-    }
-    clearRegionLimit(){this.minimum=2;this.native.setOptions({restriction:null,minZoom:2});}
+    setTheme(){this.native.setOptions({styles:TamagoTheme.googleStyles()});}
     layerGroup(){return new LayerGroup(this);}
     addFacility(data,options){return new this.classes.Facility(data,options);}
     addMarker(point,html,label,onClick,group){return group.add(new this.classes.Marker(point,html,label,onClick));}

@@ -1,63 +1,43 @@
 import {chromium,expect} from '@playwright/test';
-
-// Read-only on the live app: identities and locations are browser-only fixtures.
-const origin=process.argv[2]||'http://127.0.0.1:8078';
-if(!['http://127.0.0.1:8078','https://tamagoyaki-support.modoubletw.com'].includes(origin))throw new Error('Unexpected origin.');
-const browser=await chromium.launch({headless:true,executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'});
-const errors=[],writes=[],checks=[];
-const room={id:'venue-preview',name:'場館切換驗證',venue:'makuhari',event_date:'2026-11-13',code:'PREVIEW1'};
-const user={id:'venue-viewer',nickname:'你',username:'venue_preview'};
-const places=[{id:'makuhari',lat:35.6482,lng:140.0346703},{id:'k-arena',lat:35.4645775,lng:139.6306334},{id:'pia',lat:35.4557702,lng:139.6284058},{id:'ariake',lat:35.6433718,lng:139.7941814}];
+// Read-only fixtures; never send location or create live content.
+const origin=process.argv[2]||'http://127.0.0.1:8079';
+if(!['http://127.0.0.1:8079','https://tamagoyaki-support.modoubletw.com'].includes(origin))throw Error('Unexpected origin.');
+const browser=await chromium.launch({headless:true,executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'}),errors=[],writes=[],checks=[];
+const user={id:'venue-viewer',nickname:'場館驗證',username:'venue_preview'},room={id:'venue-preview',owner:user.id,name:'場館切換驗證',venue:'makuhari',event_date:''};
+const taiwan={lat:25.033,lng:121.5654},stamp=Date.now()/1000;
 try{
- const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
- page.on('pageerror',e=>errors.push(e.message.replace(/AIza[A-Za-z0-9_-]+/g,'[REDACTED]')));
+ const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,permissions:['geolocation'],geolocation:{latitude:taiwan.lat,longitude:taiwan.lng,accuracy:8}}),page=await context.newPage();
+ page.on('pageerror',error=>errors.push(error.message.replace(/AIza[A-Za-z0-9_-]+/g,'[REDACTED]')));
+ await page.addInitScript(()=>localStorage.setItem('tamago-limit-region','on'));
  await page.route('**/api/**',route=>{
-  const req=route.request(),path=new URL(req.url()).pathname;
-  if(req.method()!=='GET'){writes.push(path);return route.abort();}
-  if(path==='/api/me')return route.fulfill({json:{user,expeditions:[room]}});
+  const request=route.request(),path=new URL(request.url()).pathname;
+  if(new URL(request.url()).origin!==origin)return route.continue();
+  if(request.method()==='DELETE'&&path==='/api/location')return route.fulfill({json:{ok:true}});
+  if(request.method()!=='GET'){writes.push(path);return route.abort();}
+  if(path==='/api/config')return route.continue();
+  if(path==='/api/me')return route.fulfill({json:{user,expeditions:[room],help_rooms:[]}});
   if(path==='/api/friends')return route.fulfill({json:{friends:[],incoming:[],outgoing:[],sharing:false}});
-  if(path==='/api/expeditions/'+room.id)return route.fulfill({json:{room,me:{user:user.id,scope:'off',squad:null},members:[],squads:[],tasks:places.map((p,i)=>({id:'task-'+p.id,owner:'owner-'+i,owner_name:'隊友 '+i,assignee:user.id,title:'場館會合 '+i,kind:'help',status:'accepted',lat:p.lat+.002,lng:p.lng+.002,location_visible:true,location_source:'published',created:Date.now()/1000,expires:Date.now()/1000+3600})),pins:[]}});
-  return route.continue();
+  if(path==='/api/chat')return route.fulfill({json:{conversations:[],unread:0}});
+  if(path==='/api/expeditions/'+room.id)return route.fulfill({json:{room,me:{user:user.id,scope:'off',squad:null},members:[],squads:[],tasks:[],help_rooms:[],pins:[{id:'taiwan-point',owner:'other',owner_name:'同行夥伴',title:'台灣集合點',description:'遠方的情報點',kind:'meet',...taiwan,expires:null,created:stamp,following_author:true,reported_by_me:false,my_vote:0,likes:0,dislikes:0,can_vote:true}]}});
+  if(path.endsWith('/reports'))return route.fulfill({json:{items:[],total:0}});
+  return route.fulfill({json:{items:[],expeditions:[]}});
  });
- async function ready(){await expect.poll(()=>page.evaluate(()=>!!map?.isGoogle&&!state.demo&&lastTeamSyncAt>0),{timeout:25000}).toBe(true);}
- async function checkGooglePlace(place){
-  await expect(page.locator('#region-venue')).toHaveValue(place.id);await expect(page.locator('#region-toggle')).toHaveAttribute('aria-pressed','true');
-  await expect.poll(()=>page.evaluate(()=>map.getCenter().lat)).toBeCloseTo(place.lat,3);
-  await expect.poll(()=>page.evaluate(()=>map.getCenter().lng)).toBeCloseTo(place.lng,3);
-  const circle=await page.evaluate(()=>{const c=layers.items.find(x=>x instanceof google.maps.Circle);return {center:c?.getCenter().toJSON(),radius:c?.getRadius()};});
-  expect(circle.radius).toBe(1000);expect(circle.center.lat).toBeCloseTo(place.lat,5);expect(circle.center.lng).toBeCloseTo(place.lng,5);
-  await expect(page.locator('.venue-map-point.is-current')).toHaveCount(1);
-  await expect(page.locator('.teammate-map-label')).toHaveText(place.id==='k-arena'?['隊友 1','隊友 2']:['隊友 '+places.indexOf(place)]);
-  expect(await page.evaluate(()=>state.room.id)).toBe(room.id);
+ await page.goto(origin);await expect.poll(()=>page.evaluate(()=>!!map&&!state.demo&&friends.ready()),{timeout:30000}).toBe(true);await page.evaluate(()=>clearInterval(pollTimer));
+ const google=await page.evaluate(()=>!!map.isGoogle);if(origin.startsWith('https'))expect(google).toBe(true);
+ async function unrestricted(){
+  await expect(page.locator('#region-toggle,.region-boundary,.region-mask')).toHaveCount(0);await expect(page.locator('.venue-map-point')).toHaveCount(4);await expect(page.getByTitle('台灣集合點',{exact:true})).toHaveCount(1);
+  expect(await page.evaluate(()=>map.isGoogle?map.native.get('restriction')==null:!map.options.maxBounds)).toBe(true);expect(await page.evaluate(()=>map.getMinZoom())).toBe(2);
  }
- await page.goto(origin);await ready();await expect(page.locator('#region-venue option')).toHaveCount(4);
- for(const place of places){await page.locator('#region-venue').selectOption(place.id);await checkGooglePlace(place);}
- checks.push('all four Japanese venue centres update the 1 km boundary, markers and authorized targets without changing membership');
- await page.evaluate(()=>refresh());await checkGooglePlace(places[3]);
- await page.reload();await ready();await checkGooglePlace(places[3]);checks.push('venue selection survives sync and reload while joined to another venue');
- await page.locator('#region-toggle').click();await expect(page.locator('.venue-map-point')).toHaveCount(4);
- expect(await page.evaluate(()=>map.native.get('restriction'))).toBeNull();
- await page.evaluate(place=>map.setView([place.lat,place.lng],16),places[1]);
- await page.locator('.google-custom-marker[aria-label="Kアリーナ横浜 · 固定地標"]').click();await checkGooglePlace(places[1]);
- await page.locator('#region-toggle').click();await page.locator('#region-venue').selectOption('pia');await checkGooglePlace(places[2]);
- checks.push('unlimited map includes all four permanent landmarks; selecting a venue or marker restores its 1 km view');
- for(const width of [320,768,1024,1440]){
-  await page.setViewportSize({width,height:900});
-  const stage=await page.locator('.map-stage').boundingBox(),controls=await page.locator('.map-control-actions').boundingBox();
-  expect(controls.x).toBeGreaterThanOrEqual(stage.x);expect(controls.x+controls.width).toBeLessThanOrEqual(stage.x+stage.width);
-  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
- }
- await page.setViewportSize({width:390,height:844});
- await page.waitForFunction(()=>{const tiles=[...document.querySelectorAll('#map img')].filter(img=>img.src.includes('/maps/vt'));return tiles.length>0&&tiles.every(img=>img.complete&&img.naturalWidth>0);},{},{timeout:20000});
- await page.waitForTimeout(400);await page.screenshot({path:'artifacts/venue-switch-mobile.png'});
- await page.setViewportSize({width:320,height:568});await page.screenshot({path:'artifacts/venue-switch-small.png'});
- checks.push('venue selector and map controls fit mobile, tablet and desktop widths');
- await page.evaluate(()=>window.gm_authFailure());await expect(page.locator('.region-boundary')).toBeVisible({timeout:15000});
- expect(await page.evaluate(()=>map.getCenter().lat)).toBeCloseTo(places[2].lat,3);
- await page.locator('#region-venue').selectOption('ariake');
- expect(await page.evaluate(()=>layers.getLayers().find(x=>x instanceof L.Circle).getLatLng().lng)).toBeCloseTo(places[3].lng,5);
- await page.locator('#region-toggle').click();await expect(page.locator('.region-boundary')).toHaveCount(0);await expect(page.locator('.venue-map-point')).toHaveCount(4);
- checks.push('Leaflet fallback uses the selected venue and the same range toggle');
- expect(writes).toEqual([]);expect(errors).toEqual([]);console.log(JSON.stringify({ok:true,origin,checks,writes,errors}));
-}catch(error){console.error(JSON.stringify({error:error.message.replace(/AIza[A-Za-z0-9_-]+/g,'[REDACTED]'),errors,writes}));process.exitCode=1;}
-finally{await browser.close();}
+ await unrestricted();const venues=await page.evaluate(()=>config.venues);
+ for(const venue of venues){await page.locator('#region-venue').selectOption(venue.id);await expect.poll(()=>page.evaluate(()=>map.getCenter().lat)).toBeCloseTo(venue.lat,3);await expect.poll(()=>page.evaluate(()=>map.getCenter().lng)).toBeCloseTo(venue.lng,3);await unrestricted();expect(await page.evaluate(()=>state.room.id)).toBe(room.id);}
+ checks.push('range toggle, boundary mask, camera restriction and distance-based marker filtering are removed; all four venue shortcuts retain their verified coordinates and membership');
+ await page.evaluate(()=>showLocation());await page.locator('#location-scope-local').check();await page.locator('#location-form [type=submit]').click();await expect(page.locator('#dialog')).toBeHidden();await context.setGeolocation({latitude:taiwan.lat,longitude:taiwan.lng,accuracy:8});await expect.poll(()=>page.evaluate(()=>state.position?.lat),{timeout:15000}).toBe(taiwan.lat);await expect.poll(()=>page.evaluate(()=>map.getCenter().lat)).toBeCloseTo(taiwan.lat,3);await unrestricted();
+ await page.evaluate(()=>stopLocation({remote:false}));await page.evaluate(()=>selectTarget('pin','taiwan-point'));await expect(page.locator('#target-card')).toContainText('台灣集合點');await expect.poll(()=>page.evaluate(()=>map.getCenter().lng)).toBeCloseTo(taiwan.lng,3);await page.locator('[data-action=target-close]').click();
+ await page.evaluate(point=>map.setView([point.lat,point.lng],3),taiwan);await expect.poll(()=>page.evaluate(()=>map.getZoom())).toBe(3);
+ for(const width of [320,390,768,1024,1440]){await page.setViewportSize({width,height:900});await page.waitForTimeout(200);await expect.poll(()=>page.evaluate(()=>map.getCenter().lat)).toBeCloseTo(taiwan.lat,0);expect(await page.evaluate(()=>map.getZoom())).toBe(3);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await unrestricted();}
+ checks.push('Taiwan GPS, distant landmarks and world zoom work without changing venue; resize preserves the chosen center and zoom at phone/tablet/desktop widths');
+ await page.evaluate(()=>showPublish('pin',{lat:25.033,lng:121.5654}));await page.locator('#use-position').click();await expect(page.locator('#coord-value')).toContainText('25.03300');await page.locator('#dialog [data-action=close]').click();
+ await page.setViewportSize({width:390,height:844});await page.locator('#region-venue').selectOption('k-arena');await page.screenshot({path:`artifacts/map-unrestricted-${google?'google':'leaflet'}-390.png`});
+ if(google){await page.evaluate(()=>window.gm_authFailure());await expect.poll(()=>page.evaluate(()=>!!map&&!map.isGoogle)).toBe(true);await unrestricted();await page.locator('#region-venue').selectOption('pia');await expect.poll(()=>page.evaluate(()=>map.getCenter().lat)).toBeCloseTo(venues.find(item=>item.id==='pia').lat,3);checks.push('Google-to-Leaflet fallback also stays unrestricted and retains functional venue shortcuts');}
+ expect(errors).toEqual([]);expect(writes).toEqual([]);console.log(JSON.stringify({ok:true,origin,google,checks,errors,writes}));
+}finally{await browser.close();}

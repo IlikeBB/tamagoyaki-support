@@ -1,0 +1,35 @@
+:root{color-scheme:light}
+:root[data-theme=dark]{color-scheme:dark;--paper:#14211c;--surface:#1d2b24;--ink:#e6eee7;--muted:#afbbb1;--line:#485a4e;--orange:#f6a07f;--orange-soft:#422c24;--yellow:#f7b84b;--green:#a9d4b2;--green-soft:#293e30;--blue:#96cddd;--shadow:0 4px 20px #0005}
+.theme-setting{position:relative;display:flex;align-items:center;gap:16px;min-height:64px;margin:18px 0;padding:14px;border:1px solid var(--line);border-radius:10px;background:var(--paper);cursor:pointer}
+.theme-setting>span:first-child{flex:1;min-width:0}.theme-setting strong{display:block;font-size:14px}.theme-setting small{display:block;margin-top:4px;font-size:11px;font-weight:400;color:var(--muted)}
+.theme-setting input[data-theme-toggle]{position:absolute;right:14px;top:50%;transform:translateY(-50%);width:48px;min-height:44px;height:44px;margin:0;opacity:0;cursor:pointer;z-index:1}
+.theme-switch{position:relative;display:block;width:48px;height:28px;flex:none;background:var(--muted);border:1px solid var(--line);border-radius:20px;pointer-events:none}
+.theme-switch:after{content:"";position:absolute;left:3px;top:3px;width:20px;height:20px;border-radius:50%;background:var(--surface)}
+.theme-setting input:checked+.theme-switch{background:var(--green)}.theme-setting input:checked+.theme-switch:after{transform:translateX(20px)}.theme-setting input:focus-visible+.theme-switch{outline:3px solid var(--blue);outline-offset:4px}
+html[data-theme=dark] input:not([type=checkbox]):not([type=radio]),html[data-theme=dark] select,html[data-theme=dark] textarea{background:var(--paper);border-color:var(--line);color:var(--ink)}
+html[data-theme=dark] input::placeholder,html[data-theme=dark] textarea::placeholder{color:var(--muted);opacity:1}
+html[data-theme=dark] .map-stage,html[data-theme=dark] .leaflet-container{background:#1d2c26}
+html[data-theme=dark] .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.83) saturate(.55)}
+html[data-theme=dark] .facility-overlay{filter:brightness(.6) saturate(.65)}
+html[data-theme=dark] .leaflet-control-attribution{background:#1d2b24eb!important;color:var(--muted)}
+html[data-theme=dark] .leaflet-control-attribution a{color:var(--blue)}
+html[data-theme=dark] .button.primary{background:#bb4826;color:#fff}html[data-theme=dark] .button.primary:hover{background:#a83e1f}
+html[data-theme=dark] .button.dark,html[data-theme=dark] .filters button.active,html[data-theme=dark] .toast{background:#365341;color:#f4f7f2;border-color:var(--line)}
+html[data-theme=dark] .map-button,html[data-theme=dark] .location-card,html[data-theme=dark] .target-card,html[data-theme=dark] .finder-window,html[data-theme=dark] .venue-map-point>span{border-color:var(--line)}
+html[data-theme=dark] .location-symbol{color:#293e36}html[data-theme=dark] .count{background:#ffffff0e}
+html[data-theme=dark] .pin-row-icon,html[data-theme=dark] .avatar.blue{background:#243e44;color:var(--blue)}
+html[data-theme=dark] .tag.bounty{background:#40351b;color:#f0ce79}
+html[data-theme=dark] .tag.help,html[data-theme=dark] .help-setup{background:#432923;color:#ffb2a8;border-color:#9a665d}
+html[data-theme=dark] .form-error{color:#ffb2a8}
+html[data-theme=dark] .demo-banner{background:#382f1fea;color:#e9cd95;border-color:#706343}
+html[data-theme=dark] .demo-banner button{color:#e9cd95}
+html[data-theme=dark] .map-caption{background:#1d2b24df;color:var(--muted)}
+html[data-theme=dark] .finder-guidance,html[data-theme=dark] .finder-arrow{border-color:var(--line)}
+html[data-theme=dark] .finder-arrow{box-shadow:inset 0 0 0 5px var(--surface),inset 0 0 0 6px var(--line)}
+html[data-theme=dark] dialog::backdrop{background:#060e0bb3}
+html[data-theme=dark] .chat-contact-icon.expedition{background:#243e44;border-color:var(--line)}
+html[data-theme=dark] #chat-send,html[data-theme=dark] #chat-new{background:#365341;color:#f4f7f2}
+html[data-theme=dark] #chat-unread,html[data-theme=dark] .chat-count{background:#bb4826;color:#fff}
+html[data-theme=dark] .place-search form [type=submit],html[data-theme=dark] .place-selected-actions button:first-child,html[data-theme=dark] .friend-sharing [aria-checked=true]{background:#365341;color:#f4f7f2;border-color:var(--line)}
+html[data-theme=dark] .team-nav-icon,html[data-theme=dark] .radar-chip.is-member:not(.is-selected) .radar-arrow-badge{background:#243e44;color:var(--blue);border-color:var(--line)}
+html[data-theme=dark] .skip-link,html[data-theme=dark] .teammate-map-initial,html[data-theme=dark] .relationship-map-direction{background:#365341;color:#f4f7f2}
