@@ -201,7 +201,6 @@ function renderMap(){
   const sharedOwners=new Set(sharedPoints.map(p=>p.owner)),helpOwners=new Set();
   visibleTeammateKey=guidanceKey();
   layers.clearLayers();
-  if(!pinFilters||pinFilters.venuesVisible())config.venues.filter(validMapPoint).forEach(v=>marker(v,`<div class="venue-map-point ${v.id===state.activeVenue?'is-current':''}"><div class="map-pin venue">${icon('ticket')}</div><span>${esc(v.short)}</span></div>`,`${v.name} · 固定地標`,()=>switchVenue(v.id)));
   if(placeSearch?.selected&&validMapPoint(placeSearch.selected))marker(placeSearch.selected,`<div class="map-pin blue search-result-marker">${icon('search')}</div>`,`${placeSearch.selected.name} · 搜尋結果`,()=>placeSearch.showSelected());
   state.pins.filter(validMapPoint).filter(p=>!pinFilters||pinFilters.matches(p)).forEach(p=>{
     const html=p.kind==='message'?`<div class="ground-message-marker"><span>${icon('message')}</span><small>留言</small></div>`:`<div class="map-pin blue">${icon(p.kind==='shop'?'shop':'pin')}</div>`;
@@ -223,7 +222,7 @@ function renderMap(){
     marker(state.position,MapPresence.render({kind:'self',angle:stale?null:state.heading,lastKnown:stale,label:`你 · ${stale?`最後位置 · ${LocationState.age(lastPositionAt/1000)}`:accuracy}`}),'我的位置');
     MapPresence.updateSelf($('#map .self-map-point'),stale?null:state.heading);
   }
-  pinFilters?.update(state.pins.filter(validMapPoint),config.venues.filter(validMapPoint).length);renderRadar();renderTarget();
+  pinFilters?.update(state.pins.filter(validMapPoint));renderRadar();renderTarget();
 }
 function personMarker(t){
   if(t.help_shared||t.help_active)return marker(t,`<div class="help-map-marker" aria-hidden="true">!</div>${LocationState.lastKnown(t)?`<span class="teammate-map-label">最後位置 · ${LocationState.age(t.located)}</span>`:''}`,`${t.owner_name} · ${LocationState.source(t)}`,()=>selectTarget(['friend','member'].includes(t.kind)?t.kind:'task',t.id));
@@ -791,7 +790,7 @@ async function taskAction(id,action){
   }catch(e){toast(e.message);}finally{state.pending=false;}
 }
 function help(){
-  dialog(`<h2>和熟悉的人，一起會合。</h2><ol class="help-list"><li><strong>定位分享：</strong>主動開啟定位後，預設分享給好友與目前小隊；也可選僅供本機、僅好友、僅小隊或任務接取者。</li><li><strong>加入好友：</strong>到「好友」輸入對方帳號，雙方接受後即可選擇與好友分享，不必加入隊伍。</li><li><strong>選擇遠征隊：</strong>登入後，在場館列表加入隊伍。一般遠征隊成員看不到個別定位，可在隊內發布任務與地標。</li><li><strong>一般任務：</strong>記錄目前位置，任務發布點只有接取者能取得。停止即時定位不會移除發布點，撤回任務可停止提供。</li><li><strong>發布求助：</strong>須允許 GPS，位置會分享給求助所在遠征隊的所有成員，地圖顯示紅色驚嘆號；刪除最後一個求助後才停止持續分享。</li><li><strong>前往會合：</strong>好友、已分享位置的小隊成員及已接任務，都可在尋人視窗查看方向與直線距離。</li><li><strong>地標篩選：</strong>左側可勾選追蹤作者、我留言過、我按讚過的地標；留言或按讚會自動追蹤作者。</li><li><strong>長按地圖：</strong>在選定位置插旗發布任務，或建立限時／永久地標。也可按地圖右側地標按鈕選擇地圖中心。</li><li><strong>管理情報點：</strong>為同隊夥伴標記攤位、配布、洗手間或集合點；只有建立者或管理員（遠征隊隊長）能刪除。</li></ol><p class="field-note">切換分享對象會先撤回原本的即時位置。停止定位或登出會立即撤回即時座標。超過 2 分鐘未更新會標示「最後位置」，滿 15 分鐘未更新後隱藏。情報點與任務發布點依原本權限保留。</p><p class="field-note">網頁不能跨其他 App 懸浮；切到背景會保留最後位置 15 分鐘，手機系統可能暫停 GPS 更新；回到網頁會重新定位。距離是直線距離，室內 GPS 可能不準確。可自由移動地圖，或使用場館選單快速切換地點。</p><button class="button primary full" data-action="close">知道了 ${icon('arrow')}</button>`);
+  dialog(`<h2>和熟悉的人，一起會合。</h2><ol class="help-list"><li><strong>定位分享：</strong>主動開啟定位後，預設分享給好友與目前小隊；也可選僅供本機、僅好友、僅小隊或任務接取者。</li><li><strong>加入好友：</strong>到「好友」輸入對方帳號，雙方接受後即可選擇與好友分享，不必加入隊伍。</li><li><strong>選擇遠征隊：</strong>登入後，在場館列表加入隊伍。一般遠征隊成員看不到個別定位，可在隊內發布任務與地標。</li><li><strong>一般任務：</strong>記錄目前位置，任務發布點只有接取者能取得。停止即時定位不會移除發布點，撤回任務可停止提供。</li><li><strong>發布求助：</strong>須允許 GPS，位置會分享給求助所在遠征隊的所有成員，地圖顯示紅色驚嘆號；刪除最後一個求助後才停止持續分享。</li><li><strong>前往會合：</strong>好友、已分享位置的小隊成員及已接任務，都可在尋人視窗查看方向與直線距離。</li><li><strong>地標篩選：</strong>左側可勾選追蹤者的地標、按讚的地標、留言過的地標；留言或按讚會自動追蹤作者。</li><li><strong>長按地圖：</strong>在選定位置插旗發布任務，或建立限時／永久地標。也可按地圖右側地標按鈕選擇地圖中心。</li><li><strong>管理情報點：</strong>為同隊夥伴標記攤位、配布、洗手間或集合點；只有建立者或管理員（遠征隊隊長）能刪除。</li></ol><p class="field-note">切換分享對象會先撤回原本的即時位置。停止定位或登出會立即撤回即時座標。超過 2 分鐘未更新會標示「最後位置」，滿 15 分鐘未更新後隱藏。情報點與任務發布點依原本權限保留。</p><p class="field-note">網頁不能跨其他 App 懸浮；切到背景會保留最後位置 15 分鐘，手機系統可能暫停 GPS 更新；回到網頁會重新定位。距離是直線距離，室內 GPS 可能不準確。可自由移動地圖，或使用場館選單快速切換地點。</p><button class="button primary full" data-action="close">知道了 ${icon('arrow')}</button>`);
 }
 document.addEventListener('click',async e=>{
   const b=e.target.closest('button');if(!b)return;
