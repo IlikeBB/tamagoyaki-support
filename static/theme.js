@@ -24,6 +24,8 @@ window.TamagoTheme=(()=>{
       {elementType:'labels.text.fill',stylers:[{color:'#c7d6cc'}]},
       {elementType:'labels.text.stroke',stylers:[{color:'#17241e'}]},
       {featureType:'landscape',elementType:'geometry',stylers:[{color:'#22372b'}]},
+      {featureType:'landscape.man_made',elementType:'geometry.fill',stylers:[{color:'#385244'}]},
+      {featureType:'landscape.man_made',elementType:'geometry.stroke',stylers:[{color:'#7b9c87'}]},
       {featureType:'road',elementType:'geometry',stylers:[{color:'#42534a'}]},
       {featureType:'road.highway',elementType:'geometry',stylers:[{color:'#667055'}]},
       {featureType:'transit',elementType:'geometry',stylers:[{color:'#34493e'}]},
