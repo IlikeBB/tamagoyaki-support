@@ -28,8 +28,8 @@ try{
  expect((await api(a,'/friends')).outgoing.map(p=>p.id)).toContain(b.user.id);await a.page.locator('[data-friend-close]').click();
  await openPerson(a,b);await expect(a.page.locator('[data-friend-status]')).toContainText('等待對方接受');await expect(a.page.locator('[data-friend-send]')).toBeHidden();await a.page.locator('[data-friend-close]').click();
  checks.push('chat shows current avatar or initial; own avatar cannot invite; tapping another avatar sends a single invitation and prevents repeat sends');
- await b.page.evaluate(()=>friends.sync());await b.page.locator('#news-launcher').click();
- await expect(b.page.locator('#news-invitations')).toBeVisible();await expect(b.page.locator('.news-invite')).toHaveCount(1);await expect(b.page.locator('.news-unread')).toBeVisible();
+ await b.page.evaluate(()=>friends.sync());await b.page.evaluate(()=>news.open());
+ await expect(b.page.locator('#news-invitations')).toBeVisible();await expect(b.page.locator('.news-invite')).toHaveCount(1);await expect(b.page.locator('#account-news-unread')).toBeVisible();
  await b.page.locator('[data-news-filter=friends]').click();await expect(b.page.locator('#news-list .news-item')).toHaveCount(0);
  await b.page.screenshot({path:'artifacts/news-friend-invitation-mobile.png'});
  for(const width of [320,768,1024,1440]){await b.page.setViewportSize({width,height:844});const box=await b.page.locator('#news-dialog').boundingBox();expect(box.x+box.width).toBeLessThanOrEqual(width);expect(await b.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);}
@@ -47,7 +47,7 @@ try{
  releaseSnapshot();
  await expect(b.page.locator('.news-invite')).toHaveCount(0);await expect(b.page.locator('[data-news-filter=friends]')).toHaveText('好友邀請');
  await b.page.unroute('**/api/friends',holdOldSnapshot);
- await expect(b.page.locator('.news-unread')).toBeHidden();
+ await expect(b.page.locator('#account-news-unread')).toBeHidden();
  expect((await api(b,'/friends')).friends.map(p=>p.id)).toContain(a.user.id);expect((await api(a,'/friends')).friends.map(p=>p.id)).toContain(b.user.id);
  expect((await api(b,'/friends')).sharing).toBe(false);await b.page.locator('#news-close').click();
  await a.page.evaluate(()=>friends.sync());await openPerson(a,b);await expect(a.page.locator('[data-friend-status]')).toHaveText('你們已經是好友。');await a.page.locator('[data-friend-close]').click();
@@ -61,7 +61,7 @@ try{
  checks.push('incoming invitation also links from the chat card to News; rejecting removes the request without becoming friends');
  // Logout must clear a private request even while News remains open.
  await openPerson(a,c);await a.page.locator('[data-friend-send]').click();await expect(a.page.locator('[data-friend-status]')).toContainText('好友邀請已送出');await a.page.locator('[data-friend-close]').click();
- await c.page.evaluate(()=>friends.sync());await c.page.locator('#news-launcher').click();await expect(c.page.locator('.news-invite')).toHaveCount(1);
+ await c.page.evaluate(()=>friends.sync());await c.page.evaluate(()=>news.open());await expect(c.page.locator('.news-invite')).toHaveCount(1);
  await c.page.evaluate(()=>logout());await expect(c.page.locator('.news-invite')).toHaveCount(0);await expect(c.page.locator('[data-news-filter=friends]')).toBeHidden();
  expect(await c.page.evaluate(()=>localStorage.getItem('tamago-news-read'))).not.toContain(a.user.id);
  checks.push('logout clears private invitation UI; private invitation identities never enter persisted public-news read records');

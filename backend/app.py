@@ -25,6 +25,7 @@ from .chat import Chat
 from .reputation import Reputation
 from .profile_media import ProfileMedia
 from .profiles import Profiles
+from .profile_content import ProfileContent
 from .task_feedback import TaskFeedback
 from .squad_invites import SquadInvites
 
@@ -96,6 +97,7 @@ reputation = Reputation(connect, accounts)
 task_feedback = TaskFeedback(connect, accounts)
 profile_media = ProfileMedia(connect, accounts)
 profiles = Profiles(connect, accounts, profile_media, reputation, ACTIVITY_VENUES,task_feedback)
+profile_content = ProfileContent(connect,accounts,reputation)
 
 
 def prune_empty_squads(c, eid=None):
@@ -204,6 +206,7 @@ reputation.install(app)
 task_feedback.install(app)
 profile_media.install(app)
 profiles.install(app)
+profile_content.install(app)
 limits = defaultdict(deque)
 last_prune = 0
 

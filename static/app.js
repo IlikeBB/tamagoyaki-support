@@ -864,6 +864,7 @@ document.addEventListener('click',async e=>{
     else if(action==='publish-intel')showPublish('pin',undefined,{lifetime:b.dataset.lifetime});
     else if(action==='ground-message')groundMessages.open();
     else if(action==='rooms')showRooms();
+    else if(action==='squads'){if(state.demo)showJoin();else{closeDialog();setTab('members');}}
     else if(action==='owned-rooms')await showOwnedRooms();
     else if(action==='delete-room')await showDeleteRoom(id);
     else if(action==='confirm-delete-room'){b.disabled=true;try{await deleteRoom(id);}finally{b.disabled=false;}}
@@ -962,7 +963,7 @@ async function init(){
     api,user:()=>state.authenticated?state.user:null,sync:()=>friends.sync({fresh:true}),
     friends:()=>friends.ownerId===state.user.id&&friends.ready()?friends.data:null,news:()=>news.open('friends')
   });
-  profilePage=new ProfileClient($('#profile-dialog'),{api,toast,user:()=>state.authenticated?state.user:null,login:uid=>{authIntent={kind:'profile',uid};showAuth();},settings:showAccount,expired:()=>friends?.actions.expired(),updated:profile=>{state.user={...state.user,...profile};render();},room:id=>openProfileRoom(id),pin:(eid,pid)=>openProfileRoom(eid,pid),taskRoom:async eid=>{await openProfileRoom(eid);setTab('tasks');},removeRoom:id=>showDeleteRoom(id)});
+  profilePage=new ProfileClient($('#profile-dialog'),{api,toast,user:()=>state.authenticated?state.user:null,login:uid=>{authIntent={kind:'profile',uid};showAuth();},settings:showAccount,expired:()=>friends?.actions.expired(),contentDeleted:(eid,pid,uid)=>{if(!state.authenticated||state.user.id!==uid||state.demo||state.room.id!==eid)return;pinRevision++;state.pins=state.pins.filter(pin=>pin.id!==pid);if(state.target?.type==='pin'&&state.target.id===pid)state.target=null;render();refresh({fresh:true});},updated:profile=>{state.user={...state.user,...profile};render();},room:id=>openProfileRoom(id),pin:(eid,pid)=>openProfileRoom(eid,pid),taskRoom:async eid=>{await openProfileRoom(eid);setTab('tasks');},removeRoom:id=>showDeleteRoom(id)});
   landmarkFeedback=new LandmarkFeedback({api,toast,context:()=>({eid:state.room.id,user:state.user.id,pins:state.pins}),committed:()=>{pinRevision++;},changed:()=>render()});
   taskFeedback=new TaskFeedback({api,toast,context:()=>({eid:state.room.id,user:state.user.id,tasks:state.tasks}),committed:()=>{taskRevision++;},changed:()=>render()});
   squadInvites=new SquadInvites({api,context:()=>!state.demo&&state.authenticated&&currentSquad()?{user:state.user.id,eid:state.room.id,sid:state.mine.squad}:null,sent:()=>chat?.tick()});

@@ -1,0 +1,19 @@
+.profile-tabs{flex-wrap:wrap}
+.profile-toolbar{flex-wrap:wrap}
+.account-button{position:relative}
+.profile-tabs button{flex:1 1 76px}
+.profile-content-card{padding:16px 0;border-bottom:1px solid var(--line)}
+.profile-content-heading{display:flex;align-items:center;gap:8px}
+.profile-content-heading>span{color:var(--blue)}
+.profile-content-heading svg,.profile-content-status svg{width:16px;height:16px}
+.profile-content-heading h4{font-size:16px;margin:0;overflow-wrap:anywhere;min-width:0}
+.profile-content-meta,.profile-content-copy{font-size:12px;overflow-wrap:anywhere;color:var(--muted);margin:8px 0}
+.profile-content-copy{color:var(--ink);white-space:pre-wrap}
+.profile-content-status{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;font-size:11px;color:var(--muted)}
+.profile-content-actions{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;margin-top:8px}
+.profile-content-card button{min-height:44px;font-size:12px;color:var(--green);text-decoration:underline;text-underline-offset:4px}
+.profile-content-card .profile-content-delete{color:var(--orange)}
+.profile-content-confirm{padding:12px;margin-top:8px;border:1px solid var(--line);border-radius:8px;background:var(--paper)}
+.profile-content-confirm p{font-size:12px;line-height:1.7;margin:0;overflow-wrap:anywhere}
+.profile-content-confirm>div{display:flex;flex-wrap:wrap;gap:20px}
+@media(max-width:520px){.profile-tabs.has-management button{flex-basis:calc((100% - 8px)/3)}}

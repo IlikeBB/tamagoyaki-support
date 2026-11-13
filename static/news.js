@@ -4,7 +4,7 @@ class NewsBoard {
   const list=root.querySelector('#news-list'),status=root.querySelector('#news-status'),retry=root.querySelector('#news-retry');
   const labels={update:'網站更新',event:'活動公告'},storageKey='tamago-news-read';
   const invitationSection=root.querySelector('#news-invitations'),invitationList=root.querySelector('#news-invitation-list');
-  let entries=[],filter='all',loading=null,error='',read=new Set(),owner=null,incoming=[],friendError='',syncError='',friendKey='',friendGeneration=0;
+  let entries=[],filter='all',loading=null,error='',read=new Set(),owner=null,incoming=[],friendError='',syncError='',friendKey='',friendGeneration=0,opener=null;
   const busy=new Set();
   try{const saved=JSON.parse(localStorage.getItem(storageKey)||'[]');if(Array.isArray(saved))read=new Set(saved.filter(v=>typeof v==='string').slice(-200));}catch{}
   const revision=item=>item.id+':'+(item.updated_at||item.published_at);
@@ -13,6 +13,7 @@ class NewsBoard {
   function badge(){
     const unread=entries.some(item=>!read.has(revision(item)));
     launcher.querySelector('.news-unread').hidden=!(unread||incoming.length);
+    document.getElementById('account-news-unread')?.toggleAttribute('hidden',!owner||!(unread||incoming.length));
     launcher.setAttribute('aria-label','News 公告'+(incoming.length?`，${incoming.length} 份好友邀請`:unread?'，有新公告':''));
   }
   function renderInvitations(){
@@ -107,11 +108,11 @@ class NewsBoard {
     render();return loading;
   }
   this.open=(category='all')=>{
-    filter=category==='friends'&&owner?'friends':'all';friendError='';if(!root.open)root.showModal();root.querySelector('.news-scroll').scrollTop=0;if(loading)render();else load();actions.sync();
+    filter=category==='friends'&&owner?'friends':'all';friendError='';if(!root.open){opener=document.activeElement;root.showModal();}root.querySelector('.news-scroll').scrollTop=0;if(loading)render();else load();actions.sync();
   };
   launcher.addEventListener('click',()=>this.open());
   root.querySelector('#news-close').addEventListener('click',()=>root.close());
-  root.addEventListener('close',()=>launcher.focus({preventScroll:true}));
+  root.addEventListener('close',()=>{const target=opener?.isConnected&&opener.getClientRects().length?opener:document.getElementById('account-button');target?.focus({preventScroll:true});});
   retry.addEventListener('click',()=>{load();actions.sync();});
   invitationList.addEventListener('click',event=>{const button=event.target.closest('[data-news-invite]');if(button)respond(button.dataset.newsInvite,button.dataset.newsResponse);});
   for(const button of root.querySelectorAll('[data-news-filter]'))button.addEventListener('click',()=>{

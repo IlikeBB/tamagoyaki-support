@@ -1,6 +1,16 @@
 {
   "announcements": [
     {
+      "id": "profile-content-management-20261114",
+      "type": "update",
+      "published_at": "2026-11-14",
+      "title": "在個人檔案管理地標與留言",
+      "body": [
+        "個人檔案新增「地標管理」與「留言管理」，可查看、刪除自己發布的地標及地面留言，刪除後保留評價與 XP。",
+        "右上角改為「小隊」捷徑；News 公告與好友邀請移至自己的個人檔案，帳號按鈕會顯示未讀提示點。"
+      ]
+    },
+    {
       "id": "intel-point-types-20261114",
       "type": "update",
       "published_at": "2026-11-14",
