@@ -15,6 +15,12 @@
 .chat-message-avatar{position:relative;flex:0 0 36px;width:36px;height:36px;margin-top:18px;padding:0;display:grid;place-items:center;border-radius:50%;background:var(--green-soft);border:1px solid var(--line);color:var(--green);font-size:13px;font-weight:650;overflow:hidden}
 button.chat-message-avatar:hover{border-color:var(--green)}
 .chat-message-avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.chat-contact-icon{position:relative;overflow:hidden;font-size:14px;font-weight:650}
+.chat-contact-icon img,.chat-heading-avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.chat-contact-heading{display:flex;align-items:center;gap:12px}
+.chat-contact-heading>div{min-width:0;flex:1}
+.chat-heading-avatar{position:relative;display:grid;place-items:center;flex:0 0 40px;width:40px;height:40px;padding:0;border:1px solid var(--line);border-radius:50%;background:var(--green-soft);color:var(--green);font-size:15px;font-weight:650;overflow:hidden}
+.chat-heading-avatar:hover{border-color:var(--green)}
 #chat-friend-dialog{width:360px;max-width:calc(100vw - 32px);max-height:calc(var(--app-height,100dvh) - 32px);padding:20px;overflow-y:auto;background:var(--surface)}
 #chat-friend-dialog [hidden]{display:none!important}
 .chat-friend-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px}

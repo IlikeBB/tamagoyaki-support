@@ -2,7 +2,7 @@
 class ChatClient {
   constructor(root,actions){
     this.actions=actions;this.root=root;this.owner=null;this.generation=0;this.selection=0;this.contacts=[];this.messages=[];this.drafts=new Map();this.retryMessages=new Map();
-    this.view=new ChatView(root,{choose:key=>this.choose(key),person:id=>{if(id!==this.owner&&this.messages.some(m=>m.sender===id))this.actions.person(id);},send:()=>this.send(),draft:text=>{if(this.active)this.drafts.set(this.active.id,text);},read:()=>this.markRead(),older:()=>this.loadOlder(),retry:()=>this.tick(),back:()=>this.back(),closed:()=>this.back()});
+    this.view=new ChatView(root,{choose:key=>this.choose(key),person:id=>{if(id!==this.owner&&(this.active?.kind==='friend'&&this.active.target===id||this.messages.some(m=>m.sender===id)))this.actions.person(id);},send:()=>this.send(),draft:text=>{if(this.active)this.drafts.set(this.active.id,text);},read:()=>this.markRead(),older:()=>this.loadOlder(),retry:()=>this.tick(),back:()=>this.back(),closed:()=>this.back()});
     for(const name of ['online','offline'])window.addEventListener(name,()=>{this.view.composer(this.sending);if(navigator.onLine)this.tick();else this.view.status('離線 · 連線後重新同步');});
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)this.tick();});
   }
@@ -25,6 +25,8 @@ class ChatClient {
     try{
       const data=await this.actions.api('/chat');if(generation!==this.generation)return;
       this.contacts=data.conversations;this.view.badge(data.unread);this.view.status('每 5 秒同步');
+      const people=new Map(this.contacts.filter(p=>p.kind==='friend'&&Object.hasOwn(p,'avatar_url')).map(p=>[p.target,p]));
+      for(const message of this.messages){const person=people.get(message.sender);if(person){message.sender_avatar_url=person.avatar_url;message.sender_name=person.title;}}
       if(this.active){const contact=this.contacts.find(t=>t.id===this.active.id);if(!contact){this.back();this.actions.toast('已移除好友或離開遠征隊，無法繼續查看對話。');}else this.active=contact;}
       this.view.threads(this.contacts,this.active);
     }catch(error){this.handle(error,generation);}

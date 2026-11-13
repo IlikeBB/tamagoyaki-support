@@ -11,6 +11,7 @@ class ChatView {
     root.querySelector('#chat-new').onclick=()=>{this.scroll.scrollTop=this.scroll.scrollHeight;actions.read();};
     this.list.onclick=event=>{const button=event.target.closest('[data-chat-key]');if(button)actions.choose(button.dataset.chatKey);};
     this.log.addEventListener('click',event=>{const button=event.target.closest('[data-chat-person]');if(button)actions.person(button.dataset.chatPerson);});
+    root.querySelector('#chat-contact-avatar').onclick=()=>{if(this.active?.kind==='friend')actions.person(this.active.target);};
     root.querySelectorAll('[data-chat-filter]').forEach(button=>button.onclick=()=>{this.filter=button.dataset.chatFilter;this.threads(this.contacts||[],this.active);});
     this.form.onsubmit=event=>{event.preventDefault();actions.send();};
     this.input.oninput=()=>{actions.draft(this.input.value);this.composer(this.busy);};
@@ -27,15 +28,29 @@ class ChatView {
   }
   status(message,error=false){this.text('chat-status',message);this.root.querySelector('#chat-retry').hidden=!error;}
   error(message=''){this.text('chat-error',message);}
+  portrait(node,name,url,group=false){
+    const key=JSON.stringify([name,url,group]);if(node.dataset.portrait===key)return;node.dataset.portrait=key;
+    node.replaceChildren();
+    if(group)node.innerHTML=icon('users');else node.textContent=[...(name||'夥伴')][0];
+    if(url){const image=document.createElement('img');image.src=url;image.alt='';image.addEventListener('error',()=>image.remove(),{once:true});node.append(image);}
+  }
+  contact(contact){
+    this.text('chat-title',contact?.title||'訊息');this.text('chat-contact-title',contact?.title||'');
+    this.text('chat-contact-subtitle',contact?.kind==='friend'?'好友私訊 · 僅你們雙方可讀':'遠征隊群聊 · 目前隊員可讀');
+    const portrait=this.root.querySelector('#chat-contact-avatar');portrait.hidden=contact?.kind!=='friend';
+    if(contact?.kind==='friend'){
+      portrait.setAttribute('aria-label','查看 '+contact.title+' 的好友選項');this.portrait(portrait,contact.title,contact.avatar_url);
+    }else{portrait.replaceChildren();delete portrait.dataset.portrait;portrait.removeAttribute('aria-label');}
+  }
   threads(contacts,active){
-    this.contacts=contacts;this.active=active;
+    this.contacts=contacts;this.active=active;this.contact(active);
     this.root.querySelectorAll('[data-chat-filter]').forEach(button=>{const on=button.dataset.chatFilter===this.filter;button.setAttribute('aria-pressed',String(on));});
     const visible=contacts.filter(t=>this.filter==='all'||t.kind===this.filter),key=JSON.stringify([visible,active?.id,this.filter]);
     if(this.list.dataset.key===key)return;this.list.dataset.key=key;
     const fragment=document.createDocumentFragment();
     for(const contact of visible){
       const button=document.createElement('button');button.type='button';button.className='chat-contact';button.dataset.chatKey=contact.id;button.setAttribute('aria-current',String(contact.id===active?.id));
-      const avatar=document.createElement('span');avatar.className='chat-contact-icon '+contact.kind;avatar.innerHTML=icon(contact.kind==='friend'?'heart':'users');
+      const avatar=document.createElement('span');avatar.className='chat-contact-icon '+contact.kind;avatar.setAttribute('aria-hidden','true');this.portrait(avatar,contact.title,contact.avatar_url,contact.kind==='expedition');
       const copy=document.createElement('span');copy.className='chat-contact-copy';
       const name=document.createElement('strong');name.textContent=contact.title;
       const note=document.createElement('small');note.textContent=contact.latest?`${contact.latest.sender_name}：${contact.latest.body}`:contact.kind==='friend'?'傳送第一則私訊':'和遠征夥伴聊聊集合與現場情報';
@@ -50,7 +65,6 @@ class ChatView {
   select(contact,draft=''){
     this.active=contact;this.root.dataset.view=contact?'conversation':'list';
     this.root.querySelector('#chat-conversation').hidden=!contact;this.root.querySelector('#chat-placeholder').hidden=!!contact;
-    this.text('chat-title',contact?.title||'訊息');this.text('chat-contact-title',contact?.title||'');this.text('chat-contact-subtitle',contact?.kind==='friend'?'好友私訊 · 僅你們雙方可讀':'遠征隊群聊 · 目前隊員可讀');
     this.input.value=draft;this.log.replaceChildren();this.root.querySelector('#chat-new').hidden=true;this.root.querySelector('#chat-older').hidden=true;this.text('chat-empty',contact?'正在載入對話…':'');this.root.querySelector('#chat-empty').hidden=false;this.error();this.composer(false);
     this.threads(this.contacts||[],contact);
     if(this.root.open)this.root.querySelector('#chat-title').focus({preventScroll:true});
@@ -59,7 +73,14 @@ class ChatView {
   messages(messages,uid,{initial=false,prepend=false,hasOlder=false}={}){
     const near=this.nearBottom(),top=this.scroll.scrollTop,height=this.scroll.scrollHeight,existing=new Map([...this.log.children].map(node=>[Number(node.dataset.messageId),node]));
     for(let i=0;i<messages.length;i++){
-      const message=messages[i];if(existing.has(message.id))continue;
+      const message=messages[i];
+      if(existing.has(message.id)){
+        const row=existing.get(message.id),portrait=row.querySelector('.chat-message-avatar');
+        this.portrait(portrait,message.sender_name,message.sender_avatar_url);
+        row.querySelector('.chat-message-meta strong').textContent=message.sender===uid?'你':message.sender_name;
+        if(message.sender!==uid)portrait.setAttribute('aria-label','查看 '+message.sender_name+' 的好友邀請選項');
+        continue;
+      }
       const row=document.createElement('li');row.dataset.messageId=message.id;row.className='chat-message'+(message.sender===uid?' is-own':'');
       const meta=document.createElement('div');meta.className='chat-message-meta';const name=document.createElement('strong');name.textContent=message.sender===uid?'你':message.sender_name;
       const time=document.createElement('time');time.dateTime=new Date(message.created*1000).toISOString();time.textContent=new Intl.DateTimeFormat('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}).format(message.created*1000);meta.append(name,time);
@@ -67,8 +88,7 @@ class ChatView {
       const copy=document.createElement('div');copy.className='chat-message-copy';copy.append(meta,body);
       const portrait=document.createElement(message.sender===uid?'span':'button');portrait.className='chat-message-avatar';
       if(message.sender!==uid){portrait.type='button';portrait.dataset.chatPerson=message.sender;portrait.setAttribute('aria-label','查看 '+message.sender_name+' 的好友邀請選項');}
-      portrait.textContent=[...(message.sender_name||'夥伴')][0];
-      if(message.sender_avatar_url){const image=document.createElement('img');image.src=message.sender_avatar_url;image.alt='';image.loading='lazy';image.addEventListener('error',()=>image.remove(),{once:true});portrait.append(image);}
+      this.portrait(portrait,message.sender_name,message.sender_avatar_url);
       row.append(portrait,copy);
       const next=[...this.log.children].find(node=>Number(node.dataset.messageId)>message.id);this.log.insertBefore(row,next||null);
     }

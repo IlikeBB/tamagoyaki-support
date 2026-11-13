@@ -58,6 +58,7 @@ class ChatTest(test_app.RendezvousTest):
     def test_chat_avatar_follows_current_profile_without_exposing_private_fields(self):
         import base64
         from tests.test_profiles import png
+        self.befriend()
         sent=self.send(self.a,self.group).json()
         self.assertIsNone(sent['sender_avatar_url'])
         payload={'image':'data:image/png;base64,'+base64.b64encode(png()).decode()}
@@ -66,11 +67,16 @@ class ChatTest(test_app.RendezvousTest):
         avatar=history[0]['sender_avatar_url']
         self.assertTrue(avatar.startswith('/api/profiles/'+self.users[0]['id']+'/media/avatar?v='))
         self.assertEqual(self.b.get(avatar).status_code,200)
+        contact=next(c for c in self.b.get('/api/chat').json()['conversations'] if c['kind']=='friend')
+        self.assertEqual(contact['avatar_url'],avatar)
+        self.assertNotIn('avatar_digest',contact)
         self.assertFalse(any(key in history[0] for key in ('avatar_digest','lat','lng','username','token')))
         self.assertEqual(self.send(self.a,self.group,'新的訊息').json()['sender_avatar_url'],avatar)
         self.assertEqual(self.outsider.get(self.group+'/messages').status_code,403)
         self.a.delete('/api/profiles/me/media/avatar')
         self.assertIsNone(self.b.get(self.group+'/messages').json()['messages'][0]['sender_avatar_url'])
+        contact=next(c for c in self.b.get('/api/chat').json()['conversations'] if c['kind']=='friend')
+        self.assertIsNone(contact['avatar_url'])
 
     def test_message_validation_retry_and_atomic_duplicate(self):
         for body in ({'body':'  \n ', 'client_id':'unique-nonce'}, {'body':'a'*2001,'client_id':'unique-nonce'},

@@ -89,14 +89,17 @@ class Chat:
             with self.connect() as c:
                 c.execute('BEGIN')
                 contacts = [dict(r) for r in c.execute('''SELECT 'friend' AS kind,u.id AS target,
-                  u.nickname AS title,'@'||u.username AS subtitle FROM friendships f
+                  u.nickname AS title,'@'||u.username AS subtitle,a.digest AS avatar_digest FROM friendships f
                   JOIN users u ON u.id=CASE WHEN f.user_a=? THEN f.user_b ELSE f.user_a END
+                  LEFT JOIN profile_media a ON a.user=u.id AND a.kind='avatar'
                   WHERE (f.user_a=? OR f.user_b=?) AND f.status='accepted' ''', (uid, uid, uid))]
                 contacts += [dict(r) for r in c.execute('''SELECT 'expedition' AS kind,e.id AS target,
                   e.name AS title,'遠征隊群聊' AS subtitle FROM members m JOIN expeditions e ON e.id=m.expedition
                   WHERE m.user=?''', (uid,))]
                 for contact in contacts:
                     kind, target = contact['kind'], contact['target']
+                    digest=contact.pop('avatar_digest',None)
+                    contact['avatar_url']=f"/api/profiles/{target}/media/avatar?v={digest}" if kind=='friend' and digest else None
                     thread = self.thread(uid, kind, target)
                     contact['id'] = kind+':'+target
                     latest = c.execute('''SELECT m.id,m.sender,u.nickname AS sender_name,
