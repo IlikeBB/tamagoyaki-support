@@ -1,6 +1,6 @@
 """Expedition leadership and membership operations; squad groups stay private."""
 from fastapi import APIRouter, HTTPException, Query, Request
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Literal
 
 
@@ -9,12 +9,18 @@ class RoleInput(BaseModel):
     role: Literal['member', 'deputy']
 
 
+class ExpeditionName(BaseModel):
+    model_config = ConfigDict(extra='forbid', str_strip_whitespace=True)
+    name: str = Field(min_length=1, max_length=60)
+
+
 class ExpeditionMembers:
     def __init__(self, connect, accounts, media, feedback, assistance, prune):
         self.connect, self.accounts, self.media = connect, accounts, media
         self.feedback, self.assistance, self.prune = feedback, assistance, prune
         self.router = APIRouter()
         self.router.add_api_route('/api/expeditions/{eid}/management', self.roster, methods=['GET'])
+        self.router.add_api_route('/api/expeditions/{eid}/name', self.rename, methods=['PUT'])
         self.router.add_api_route('/api/expeditions/{eid}/members/{uid}/role', self.set_role, methods=['PUT'])
         self.router.add_api_route('/api/expeditions/{eid}/members/{uid}', self.kick, methods=['DELETE'])
 
@@ -67,6 +73,18 @@ class ExpeditionMembers:
                              (int(body.role == 'deputy'), eid, uid)).rowcount:
                 raise HTTPException(404, '這位成員已不在遠征隊。')
         return {'ok': True}
+
+    def rename(self, eid: str, body: ExpeditionName, request: Request):
+        actor = self.accounts.current_user(request)['id']
+        with self.connect() as c:
+            c.execute('BEGIN IMMEDIATE')
+            self.accounts.require_active(c, actor)
+            room, role = self.manager(c, eid, actor)
+            if role != 'leader':
+                raise HTTPException(403, '只有團長可以變更遠征隊名稱。')
+            c.execute('UPDATE expeditions SET name=? WHERE id=?', (body.name, eid))
+            c.execute('UPDATE expedition_records SET name=? WHERE id=?', (body.name, eid))
+        return {'room': {'id': room['id'], 'name': body.name}}
 
     def kick(self, eid: str, uid: str, request: Request):
         actor = self.accounts.current_user(request)['id']

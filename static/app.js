@@ -894,7 +894,7 @@ async function init(){
   icons();
   expeditionPreview=new ExpeditionPreview({api,dialog,user:()=>state.authenticated?state.user:null,login:()=>{authIntent={kind:'expeditions-page',mode:'browse'};showAuth();},join:async(id,uid)=>{const room=await api(`/expeditions/${encodeURIComponent(id)}/join`,'POST',{});if(state.authenticated&&state.user.id===uid)await finishRoomJoin(room,false);}});
   siteAccountAdmin=new SiteAccountAdmin({api,dialog,toast,user:()=>state.authenticated?state.user:null});
-  expeditionManagement=new ExpeditionMemberManagement({api,dialog,toast,user:()=>state.authenticated?state.user:null,changed:async uid=>{const me=await api('/me');if(state.authenticated&&state.user.id===uid){state.rooms=me.expeditions;if(!state.demo)await refresh({fresh:true});render();}}});
+  expeditionManagement=new ExpeditionMemberManagement({api,dialog,toast,user:()=>state.authenticated?state.user:null,changed:async(uid,renamed)=>{const me=await api('/me');if(state.authenticated&&state.user.id===uid){state.rooms=me.expeditions;if(renamed)expeditionPage?.rename(renamed);if(!state.demo)await refresh({fresh:true});render();if(renamed)chat?.tick();}}});
   expeditionPage=new ExpeditionsPage($('#expeditions-page'),{
     api,toast,preview:room=>expeditionPreview.open(room),manage:room=>expeditionManagement.open(room),context:()=>({user:state.authenticated?state.user:null,rooms:state.rooms,current:state.demo?null:state.room.id,venues:config?activityVenues():[],venue:config?activityVenue():null}),
     rooms:rooms=>{state.rooms=rooms;},create:vid=>{state.activityVenue=vid;showJoin('create');},expired:()=>friends?.actions.expired(),back:showMap,

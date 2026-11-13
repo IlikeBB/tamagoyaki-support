@@ -1,6 +1,16 @@
 {
   "announcements": [
     {
+      "id": "expedition-rename-20261114",
+      "type": "update",
+      "published_at": "2026-11-14",
+      "title": "遠征隊名稱可以修改了",
+      "body": [
+        "團長可在「遠征隊 → 管理成員 → 變更遠征隊名稱」修改隊名，支援 1–60 個字。",
+        "新名稱會同步顯示於遠征隊列表、群聊與個人檔案牆，原邀請碼與成員資格維持不變。"
+      ]
+    },
+    {
       "id": "expedition-page-management-20261114",
       "type": "update",
       "published_at": "2026-11-14",

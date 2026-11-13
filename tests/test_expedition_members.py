@@ -3,6 +3,44 @@ from . import test_app
 
 
 class ExpeditionMembersTest(test_app.RendezvousTest):
+    def test_only_creator_can_rename_with_valid_name(self):
+        from fastapi.testclient import TestClient
+        path=self.path+'/name';original=self.room['name']
+        self.assertEqual(TestClient(self.module.app).put(path,json={'name':'新名稱'},headers={'X-Tamago-Client':'web'}).status_code,401)
+        for client in (self.b,self.c,self.outsider):
+            self.assertEqual(client.put(path,json={'name':'不應生效'}).status_code,403)
+        self.role(self.a,self.users[1]['id'])
+        self.assertEqual(self.b.put(path,json={'name':'副團長不能修改'}).status_code,403)
+        for body in ({'name':''},{'name':'   '},{'name':'a'*61},{'name':'合法','owner':self.users[1]['id']}):
+            self.assertEqual(self.a.put(path,json=body).status_code,422)
+        self.assertEqual(self.snapshot(self.a)['room']['name'],original)
+        self.assertEqual(self.a.put(path,json={'name':'  新遠征隊名稱  '}).json()['room']['name'],'新遠征隊名稱')
+        self.a.delete(self.path+'/membership')
+        self.assertEqual(self.a.put(path,json={'name':'已退出的建立者仍可管理'}).status_code,200)
+        self.assertEqual(self.a.put('/api/expeditions/missing/name',json={'name':'新名稱'}).status_code,404)
+        self.a.delete(self.path)
+        self.assertEqual(self.a.put(path,json={'name':'已刪除'}).status_code,404)
+
+    def test_rename_updates_live_surfaces_and_wall_without_changing_membership_or_code(self):
+        with self.module.connect() as db:
+            original=dict(db.execute('SELECT * FROM expeditions WHERE id=?',(self.room['id'],)).fetchone())
+            memberships=[tuple(row) for row in db.execute('SELECT * FROM members WHERE expedition=? ORDER BY user',(self.room['id'],))]
+        name='<img src=x> 同行遠征隊'
+        self.assertEqual(self.a.put(self.path+'/name',json={'name':name}).status_code,200)
+        with self.module.connect() as db:
+            renamed=dict(db.execute('SELECT * FROM expeditions WHERE id=?',(self.room['id'],)).fetchone())
+            self.assertEqual({key:value for key,value in renamed.items() if key!='name'},{key:value for key,value in original.items() if key!='name'})
+            self.assertEqual([tuple(row) for row in db.execute('SELECT * FROM members WHERE expedition=? ORDER BY user',(self.room['id'],))],memberships)
+        self.assertEqual(self.b.get(self.path+'/preview').json()['room']['name'],name)
+        self.assertEqual(self.a.get(self.path+'/management').json()['room']['name'],name)
+        self.assertEqual(next(room for room in self.b.get('/api/me').json()['expeditions'] if room['id']==self.room['id'])['name'],name)
+        self.assertEqual(next(room for room in self.outsider.get('/api/venues/makuhari/expeditions').json()['expeditions'] if room['id']==self.room['id'])['name'],name)
+        self.assertEqual(next(room for room in self.b.get('/api/profiles/me/wall').json()['items'] if room['id']==self.room['id'])['name'],name)
+        self.assertEqual(next(chat for chat in self.b.get('/api/chat').json()['conversations'] if chat['id']=='expedition:'+self.room['id'])['title'],name)
+        self.assertEqual(self.outsider.post('/api/join',json={'code':self.room['code']}).json()['name'],name)
+        self.a.delete(self.path)
+        self.assertEqual(next(room for room in self.b.get('/api/profiles/me/wall').json()['items'] if room['id']==self.room['id'])['name'],name)
+
     def role(self, client, target, value='deputy'):
         return client.put(self.path+'/members/'+target+'/role',json={'role':value})
 

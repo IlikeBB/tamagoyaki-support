@@ -12,3 +12,9 @@
 .expedition-member-confirm button{min-height:44px;margin:0 8px 0 0;font-size:12px}
 [data-member-more]{display:block;margin:12px auto}[data-member-more][hidden]{display:none}
 #owned-rooms .owned-room{flex-wrap:wrap}
+.expedition-rename{padding:8px 0;border-bottom:1px solid var(--line);margin-bottom:12px}
+.expedition-rename[hidden]{display:none}
+.expedition-rename summary{min-height:44px;display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--green);font-size:13px;font-weight:600}
+.expedition-rename summary:before{content:'＋';font-size:16px}.expedition-rename[open] summary:before{content:'−'}
+.expedition-rename input{font-size:16px;min-height:44px}.expedition-rename .button{min-height:44px;margin:0 0 12px}
+#dialog-body>[data-expedition-room-name]{overflow-wrap:anywhere}
