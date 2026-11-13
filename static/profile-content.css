@@ -1,4 +1,4 @@
-.profile-tabs{flex-wrap:wrap}
+.profile-tabs.has-management{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
 .profile-toolbar{flex-wrap:wrap}
 .account-button{position:relative}
 .profile-tabs button{flex:1 1 76px}
@@ -16,4 +16,4 @@
 .profile-content-confirm{padding:12px;margin-top:8px;border:1px solid var(--line);border-radius:8px;background:var(--paper)}
 .profile-content-confirm p{font-size:12px;line-height:1.7;margin:0;overflow-wrap:anywhere}
 .profile-content-confirm>div{display:flex;flex-wrap:wrap;gap:20px}
-@media(max-width:520px){.profile-tabs.has-management button{flex-basis:calc((100% - 8px)/3)}}
+@media(max-width:520px){.profile-tabs.has-management{grid-template-columns:repeat(2,minmax(0,1fr))}}

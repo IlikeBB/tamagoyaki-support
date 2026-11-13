@@ -1,4 +1,4 @@
-"""Private management of a user's existing landmarks and ground messages."""
+"""Private lists of authored tasks, landmarks and messages."""
 import time
 from typing import Literal
 
@@ -11,8 +11,10 @@ class ProfileContent:
 
     def install(self,app):
         @app.get('/api/profiles/me/content')
-        def listing(request: Request,kind: Literal['landmark','message']='landmark',offset: int=Query(default=0,ge=0)):
+        def listing(request: Request,kind: Literal['task','landmark','message']='landmark',offset: int=Query(default=0,ge=0)):
             uid=self.accounts.current_user(request)['id'];stamp=int(time.time())
+            if kind=='task':
+                return self.tasks(uid,stamp,offset)
             category="p.kind='message'" if kind=='message' else "p.kind<>'message'"
             selection='''SELECT p.id,'pin' AS source,p.id AS parent_pin,p.expedition,p.title,p.description,p.kind,p.created,p.expires,
               e.name AS room_name,e.venue,e.event_date,0 AS parent_removed,
@@ -53,3 +55,19 @@ class ProfileContent:
                 self.reputation.record(c,dict(pin))
                 c.execute('DELETE FROM pins WHERE id=? AND owner=?',(pid,uid))
             return {'ok':True}
+
+    def tasks(self,uid,stamp,offset):
+        # Authored lists do not expose GPS, assignees or invitation credentials.
+        selection='''FROM tasks t JOIN expeditions e ON e.id=t.expedition
+          WHERE t.owner=? AND t.status IN ('open','accepted') AND (t.expires>? OR t.help_active=1)'''
+        with self.connect() as c:
+            c.execute('BEGIN')
+            total=c.execute('SELECT COUNT(*) '+selection,(uid,stamp)).fetchone()[0]
+            items=[dict(row) for row in c.execute('''SELECT t.id,'task' AS source,t.expedition,t.title,t.description,
+              t.kind,t.status,t.created,t.expires,t.help_active,e.name AS room_name,e.venue,e.event_date,
+              EXISTS(SELECT 1 FROM members m WHERE m.user=? AND m.expedition=t.expedition) AS can_view
+              '''+selection+' ORDER BY t.created DESC,t.id DESC LIMIT 12 OFFSET ?',(uid,uid,stamp,offset))]
+            for item in items:
+                item['can_view']=bool(item['can_view'])
+                item['can_delete']=False
+        return {'items':items,'total':total,'next_offset':offset+len(items) if offset+len(items)<total else None}

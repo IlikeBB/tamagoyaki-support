@@ -26,8 +26,39 @@ class ProfileContentTest(test_app.RendezvousTest):
         self.assertEqual(self.b.get(self.base).json()['total'],1)
         self.assertEqual(self.b.get('/api/profiles/'+self.users[0]['id']+'/content').status_code,404)
         self.assertEqual(TestClient(self.module.app).get(self.base).status_code,401)
-        self.assertEqual(self.a.get(self.base+'?kind=task').status_code,422);self.assertEqual(self.a.get(self.base+'?offset=-1').status_code,422)
+        self.assertEqual(self.a.get(self.base+'?kind=unknown').status_code,422);self.assertEqual(self.a.get(self.base+'?offset=-1').status_code,422)
         self.assertEqual(self.a.get(self.base).headers['cache-control'],'no-store')
+
+    def test_authored_tasks_are_private_paginated_and_hide_finished_work(self):
+        tasks=[self.make_task() for _ in range(16)]
+        self.b.post(self.path+'/tasks/'+tasks[0]['id']+'/accept')
+        self.a.post(self.path+'/tasks/'+tasks[1]['id']+'/complete')
+        self.a.post(self.path+'/tasks/'+tasks[2]['id']+'/cancel')
+        with self.module.connect() as db:
+            db.execute('UPDATE tasks SET expires=? WHERE id=?',(self.module.now()-1,tasks[3]['id']))
+        self.b.post(self.path+'/tasks',json={'title':'別人的任務','kind':'dining','lat':25,'lng':121,'hours':2})
+        path=self.base+'?kind=task'
+        first=self.a.get(path);self.assertEqual(first.status_code,200)
+        data=first.json();self.assertEqual(data['total'],13);self.assertEqual(len(data['items']),12);self.assertEqual(data['next_offset'],12)
+        last=self.a.get(path+'&offset=12').json();self.assertIsNone(last['next_offset'])
+        rows=data['items']+last['items'];self.assertEqual(len({row['id'] for row in rows}),13)
+        self.assertEqual({row['id'] for row in rows},{task['id'] for task in tasks}-{task['id'] for task in tasks[1:4]})
+        self.assertTrue(all(row['can_view'] and not row['can_delete'] for row in rows))
+        self.assertFalse(any(set(row)&{'lat','lng','accuracy','located','assignee','code','owner'} for row in rows))
+        self.assertEqual(next(row for row in rows if row['id']==tasks[0]['id'])['status'],'accepted')
+        self.assertEqual(self.b.get(path).json()['total'],1)
+        self.assertEqual(TestClient(self.module.app).get(path).status_code,401)
+        self.assertEqual(self.b.get('/api/profiles/'+self.users[0]['id']+'/content?kind=task').status_code,404)
+        self.assertEqual(first.headers['cache-control'],'no-store')
+
+    def test_ongoing_help_stays_listed_after_expiry_and_leaving_hides_cancelled_tasks(self):
+        task=self.a.post(self.path+'/tasks',json={'title':'求助','kind':'help','lat':25,'lng':121,'accuracy':8,'help_broadcast':True,'hours':2}).json()
+        with self.module.connect() as db:
+            db.execute('UPDATE tasks SET expires=? WHERE id=?',(self.module.now()-1,task['id']))
+        rows=self.a.get(self.base+'?kind=task').json()['items'];self.assertEqual(rows[0]['id'],task['id']);self.assertTrue(rows[0]['help_active'])
+        own=self.b.post(self.path+'/tasks',json={'title':'自己的任務','kind':'dining','lat':25,'lng':121,'hours':2}).json()
+        self.b.delete(self.path+'/membership')
+        self.assertEqual(self.b.get(self.base+'?kind=task').json()['items'],[])
 
     def test_owner_can_manage_expired_and_left_private_room_content(self):
         room=self.a.post('/api/expeditions',json={'name':'私人遠征','venue':'japan','discoverable':False}).json();path='/api/expeditions/'+room['id']

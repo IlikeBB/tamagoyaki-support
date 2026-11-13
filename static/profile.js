@@ -2,7 +2,7 @@
 class ProfileClient {
   constructor(root,actions){
     this.root=root;this.actions=actions;this.owner=null;this.generation=0;this.recordRequest=0;this.tab='wall';this.items=[];this.editing=false;
-    this.view=new ProfileView(root,{tab:tab=>this.selectTab(tab),more:()=>this.records(true),photo:slot=>this.pick(slot),room:id=>this.navigate(()=>actions.room(id)),removeRoom:id=>this.navigate(()=>actions.removeRoom(id)),removeHistory:id=>this.removeHistory(id),historyBusy:()=>this.historyRemoval?.id,contentState:()=>({confirmation:this.contentConfirmation,busy:this.contentDeletion?.uid===this.uid?this.contentDeletion.id:null}),removeContent:id=>this.removeContent(id),confirmContent:id=>this.confirmContent(id),cancelContent:()=>this.cancelContent(),pin:(eid,pid)=>this.navigate(()=>actions.pin(eid,pid)),taskRoom:eid=>this.navigate(()=>actions.taskRoom(eid)),withdraw:(eid,pid,source)=>this.withdraw(eid,pid,source),edit:()=>this.edit(),settings:()=>this.navigate(actions.settings),save:form=>this.save(form),closed:()=>this.closed(),removeAvatar:()=>this.remove('avatar'),removeBanner:()=>this.remove('banner')});
+    this.view=new ProfileView(root,{tab:tab=>this.selectTab(tab),more:()=>this.records(true),photo:slot=>this.pick(slot),room:id=>this.navigate(()=>actions.room(id)),removeRoom:id=>this.navigate(()=>actions.removeRoom(id)),removeHistory:id=>this.removeHistory(id),historyBusy:()=>this.historyRemoval?.id,contentState:()=>({confirmation:this.contentConfirmation,busy:this.contentDeletion?.uid===this.uid?this.contentDeletion.id:null}),removeContent:id=>this.removeContent(id),confirmContent:id=>this.confirmContent(id),cancelContent:()=>this.cancelContent(),pin:(eid,pid)=>this.navigate(()=>actions.pin(eid,pid)),taskRoom:eid=>this.navigate(()=>actions.taskRoom(eid)),edit:()=>this.edit(),settings:()=>this.navigate(actions.settings),save:form=>this.save(form),closed:()=>this.closed(),removeAvatar:()=>this.remove('avatar'),removeBanner:()=>this.remove('banner')});
     this.crop=new ProfileCrop(root.querySelector('#profile-crop'),{opened:()=>{this.view.scroll.hidden=true;},cancelled:()=>{this.view.scroll.hidden=false;},save:(slot,image)=>this.upload(slot,image),error:message=>this.view.status(message,true)});
     this.file=root.querySelector('#profile-file');this.file.onchange=async()=>{const file=this.file.files[0];this.file.value='';try{await this.crop.open(file,this.slot);}catch(error){this.view.status(error.message,true);}};
     root.querySelector('#profile-retry').onclick=()=>this.load();root.querySelector('#profile-edit').onclick=()=>this.edit();root.querySelector('#profile-settings').onclick=()=>this.navigate(actions.settings);
@@ -51,7 +51,7 @@ class ProfileClient {
     catch(error){this.fail(error,generation);}finally{button.disabled=false;}
   }
   async selectTab(tab){
-    if(!this.data||!['wall','received','given','landmarks','messages'].includes(tab)||['given','landmarks','messages'].includes(tab)&&!this.data.profile.own)return;this.recordRequest++;this.loadingRecords=false;this.tab=tab;this.items=[];this.next=null;this.contentConfirmation=null;
+    if(!this.data||!['wall','tasks','landmarks','messages'].includes(tab)||tab!=='wall'&&!this.data.profile.own)return;this.recordRequest++;this.loadingRecords=false;this.tab=tab;this.items=[];this.next=null;this.contentConfirmation=null;
     this.root.querySelectorAll('[data-profile-action=tab]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.tab===tab)));
     this.root.querySelector('#profile-records')?.replaceChildren();this.root.querySelector('#profile-more').hidden=true;await this.records();
   }
@@ -59,17 +59,12 @@ class ProfileClient {
     if(!this.uid||this.editing||this.loadingRecords)return;
     const generation=this.generation,tab=this.tab,offset=more?this.next:0;if(offset==null)return;const request=++this.recordRequest;this.loadingRecords=true;this.view.status('正在載入紀錄…');
     try{
-      const path=ProfileContentView.managed(tab)?'/content?kind='+(tab==='messages'?'message':'landmark')+'&offset='+offset:tab==='wall'?'/wall?offset='+offset:'/feedback?kind='+tab+'&offset='+offset;
+      const path=ProfileContentView.managed(tab)?'/content?kind='+({tasks:'task',messages:'message',landmarks:'landmark'}[tab])+'&offset='+offset:'/wall?offset='+offset;
       if(ProfileContentView.managed(tab)&&(this.uid!==this.owner||!this.data?.profile.own))return;
       const data=await this.actions.api('/profiles/'+encodeURIComponent(ProfileContentView.managed(tab)?'me':this.uid)+path);if(generation!==this.generation||request!==this.recordRequest||tab!==this.tab)return;
       const all=more?[...this.items,...data.items]:data.items;this.items=all.filter((item,index,array)=>array.findIndex(other=>(other.source||'pin')+':'+(other.id||other.pin)===(item.source||'pin')+':'+(item.id||item.pin))===index);
       this.next=data.next_offset;if(ProfileContentView.managed(tab))this.contentTotal=data.total;this.view.records(this.items,tab,data.total,this.next);this.view.status('');
     }catch(error){if(request===this.recordRequest)this.fail(error,generation);}finally{if(request===this.recordRequest)this.loadingRecords=false;}
-  }
-  async withdraw(eid,pid,source='pin'){
-    const generation=this.generation;
-    try{await this.actions.api(`/expeditions/${encodeURIComponent(eid)}/${source==='task'?'tasks':'pins'}/${encodeURIComponent(pid)}/vote`,'PUT',{value:0});if(generation!==this.generation)return;await this.load();this.actions.toast('已收回評價。');}
-    catch(error){this.fail(error,generation);}
   }
   renderContent(){if(this.data&&!this.editing&&ProfileContentView.managed(this.tab))this.view.records(this.items,this.tab,this.contentTotal||0,this.next);}
   removeContent(id){
