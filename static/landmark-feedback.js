@@ -10,7 +10,8 @@ class LandmarkFeedback {
     this.pending.add(pid);this.actions.changed();
     try{
       const result=await this.actions.api(`/expeditions/${context.eid}/pins/${encodeURIComponent(pid)}/vote`,'PUT',{value:pin.my_vote===value?0:value});
-      const current=this.actions.context();if(current.eid===context.eid){
+      const current=this.actions.context();if(current.eid===context.eid&&current.user===context.user){
+        this.actions.committed();
         const index=current.pins.findIndex(p=>p.id===pid);
         if(result.removed){if(index>=0)current.pins.splice(index,1);this.actions.toast('無效票已超過有效票，地標已自動移除；評價紀錄保留。');}
         else if(index>=0)Object.assign(current.pins[index],result);

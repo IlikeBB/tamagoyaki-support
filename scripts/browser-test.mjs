@@ -67,6 +67,7 @@ try{
   await c.bringToFront();await c.locator('.mobile-tabs [data-tab=tasks]').click();await expect(c.locator('[data-action=accept]')).toBeVisible({timeout:15000});await c.locator('[data-action=accept]').click();
   await expect(c.locator('#teammate-finder')).toBeVisible();await expect(c.locator('#finder-name')).toHaveText('Captain');expect(taskFrom(await snapshot(c,room.id),task.id).lat).toBe(35.64835);expect(taskFrom(await snapshot(b,room.id),task.id).lat).toBeNull();
   await a.locator('.mobile-tabs [data-tab=tasks]').click();await a.locator('[data-action=complete]').click();
+  await expect(a.locator('.quest').filter({has:a.locator(`[data-id="${task.id}"]`)})).toHaveCount(0);expect(taskFrom(await snapshot(a,room.id),task.id).status).toBe('done');
   await expect.poll(async()=>taskFrom(await snapshot(c,room.id),task.id).lat).toBeNull();await c.bringToFront();await expect(c.locator('#finder-name')).toHaveText('',{timeout:15000});checks.push('release, reassignment and completion remove floating finder positions');
   await b.locator('#finder-close').click();
   await b.locator('.mobile-tabs [data-tab=members]').click();await expect(b.locator('.member-row')).toHaveCount(3);await expect(b.locator('.member-row [data-action=task-target]')).toHaveCount(0);await expect(b.locator('.member-row [data-action=view-profile]')).toHaveCount(3);

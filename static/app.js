@@ -32,6 +32,8 @@ const types={trade:'交換',bounty:'懸賞',giveaway:'配布',help:'求助',dini
 const pinTypes={booth:'特典／配布',toilet:'洗手間',shop:'商店',meet:'集合點',other:'其他地標',message:'地面留言'};
 const state={demo:true,authenticated:false,user:{id:'me',nickname:'你'},room:null,rooms:[],members:[],tasks:[],pins:[],squads:[],mine:{squad:null,scope:'off'},activeVenue:'makuhari',tab:'tasks',filter:'all',query:'',position:null,heading:null,scope:'off',watch:null,radar:true,target:null,online:true,pending:false};
 let map, layers, config, toastTimer, refreshing=false, lastSent=0, pollTimer;
+let pinRevision=0;
+const pendingPinDeletes=new Set();
 let locationGeneration=0, locationWrites=Promise.resolve(), gpsPending=false, lastPositionAt=0, lastPublishedSampleAt=0;
 let authIntent=null;
 let facilityLayer=null;
@@ -355,12 +357,21 @@ function renderTarget(){
   const el=$('#target-card');const target=targetPoint();el.classList.toggle('hidden',!target);if(!target)return;
   const d=distance(state.position,target),b=state.position?bearing(state.position,target):null,ownStale=LocationState.stale(lastPositionAt/1000);
   const rotation=((b??0)-(state.heading??0)+360)%360;
-  el.innerHTML=`<div class="target-top"><span>${esc(target.mode)}${state.demo?' · 演示':''}</span><button class="target-close" data-action="target-close" aria-label="結束追蹤">${icon('close')}</button></div><h2>${esc(target.title)}</h2><div class="target-direction"><span class="arrow" style="transform:rotate(${rotation}deg)">↑</span><div><strong>${d==null?'開啟定位':(ownStale||LocationState.lastKnown(target)?'約 ':'')+meters(d)}</strong><small>${b==null?'定位後顯示相對距離':`${direction(b)} · ${state.heading==null?'北朝上，尚未啟用指南針':'相對手機朝向'}`}</small></div></div><p class="field-note">直線方向，非步行路線${ownStale?` · 依你的最後位置（${LocationState.age(lastPositionAt/1000)}）估算`:''}${target.accuracy!=null?` · 對方精度 ±${Math.round(target.accuracy)}m`:''}</p>${state.target?.type==='pin'?landmarkFeedback?.controls(target)||'':''}${state.target?.type==='pin'&&target.can_delete?`<button class="text-button delete-pin" data-action="delete-pin" data-id="${esc(target.id)}">刪除此地標</button>`:''}`;
-  if(target.kind==='message'){
-    const copy=document.createElement('blockquote');copy.className='ground-message-copy';copy.textContent=target.description;
-    const author=document.createElement('div');author.className='ground-message-author';author.innerHTML=profileAvatar(target.owner_name,target.owner,target.owner_avatar_url)+'<span>'+esc(target.owner_name)+' · '+age(target.created)+'</span>';
-    el.querySelector('h2').textContent='地面留言';el.querySelector('h2').after(author,copy);
+  const contentKey=JSON.stringify([state.target?.type,target,state.demo,pendingPinDeletes.has(target.id),landmarkFeedback?.pending.has(target.id),target.kind==='message'?age(target.created):'']);
+  // Preserve map controls while GPS and compass values change.
+  if(el.dataset.contentKey!==contentKey){
+    el.dataset.contentKey=contentKey;
+    el.innerHTML=`<div class="target-top"><span>${esc(target.mode)}${state.demo?' · 演示':''}</span><button class="target-close" data-action="target-close" aria-label="結束追蹤">${icon('close')}</button></div><h2>${esc(target.title)}</h2><div class="target-direction"><span class="arrow" style="transform:rotate(${rotation}deg)">↑</span><div><strong>${d==null?'開啟定位':(ownStale||LocationState.lastKnown(target)?'約 ':'')+meters(d)}</strong><small>${b==null?'定位後顯示相對距離':`${direction(b)} · ${state.heading==null?'北朝上，尚未啟用指南針':'相對手機朝向'}`}</small></div></div><p class="field-note">直線方向，非步行路線${ownStale?` · 依你的最後位置（${LocationState.age(lastPositionAt/1000)}）估算`:''}${target.accuracy!=null?` · 對方精度 ±${Math.round(target.accuracy)}m`:''}</p>${state.target?.type==='pin'?landmarkFeedback?.controls(target)||'':''}${state.target?.type==='pin'&&target.can_delete?`<button class="text-button delete-pin" data-action="delete-pin" data-id="${esc(target.id)}" ${pendingPinDeletes.has(target.id)?'disabled aria-busy="true"':''}>${pendingPinDeletes.has(target.id)?'刪除中…':'刪除此地標'}</button>`:''}`;
+    if(target.kind==='message'){
+      const copy=document.createElement('blockquote');copy.className='ground-message-copy';copy.textContent=target.description;
+      const author=document.createElement('div');author.className='ground-message-author';author.innerHTML=profileAvatar(target.owner_name,target.owner,target.owner_avatar_url)+'<span>'+esc(target.owner_name)+' · '+age(target.created)+'</span>';
+      el.querySelector('h2').textContent='地面留言';el.querySelector('h2').after(author,copy);
+    }
   }
+  el.querySelector('.target-direction .arrow').style.transform=`rotate(${rotation}deg)`;
+  el.querySelector('.target-direction strong').textContent=d==null?'開啟定位':(ownStale||LocationState.lastKnown(target)?'約 ':'')+meters(d);
+  el.querySelector('.target-direction small').textContent=b==null?'定位後顯示相對距離':`${direction(b)} · ${state.heading==null?'北朝上，尚未啟用指南針':'相對手機朝向'}`;
+  el.querySelector(':scope > p.field-note').textContent=`直線方向，非步行路線${ownStale?` · 依你的最後位置（${LocationState.age(lastPositionAt/1000)}）估算`:''}${target.accuracy!=null?` · 對方精度 ±${Math.round(target.accuracy)}m`:''}`;
 }
 function selectTarget(type,id){
   if(['task','friend','member'].includes(type)&&navigationTargets().some(t=>t.id===id)){
@@ -405,7 +416,7 @@ function renderPanel(){
   if(state.tab==='friends'){friends.mount(root,q);return;}
   const match=x=>[x.title,x.description,x.nickname,x.owner_name].some(v=>v?.toLocaleLowerCase().includes(q));
   if(state.tab==='tasks'){
-    const tasks=state.tasks.filter(t=>t.status!=='cancelled'&&match(t)&&(state.filter==='all'||state.filter===t.kind||(state.filter==='mine'&&(t.owner===state.user.id||t.assignee===state.user.id))));
+    const tasks=state.tasks.filter(t=>['open','accepted'].includes(t.status)&&match(t)&&(state.filter==='all'||state.filter===t.kind||(state.filter==='mine'&&(t.owner===state.user.id||t.assignee===state.user.id))));
     root.innerHTML=tasks.map((t,i)=>{
       const own=t.owner===state.user.id,accepted=t.assignee===state.user.id,done=t.status==='done';
       const caption=t.help_active?'查看求助位置':done?'已完成':own?'查看任務位置':accepted?(t.location_mode==='fixed'?'前往旗標':'前往會合'):t.status==='accepted'?'已有人接取':'接取任務';
@@ -415,7 +426,7 @@ function renderPanel(){
   }else if(state.tab==='members'){
     root.innerHTML=`${!state.demo?SquadPanel.render(state):''}<div class="subheading">${state.members.length} 位遠征夥伴</div>`+state.members.filter(match).map((m,i)=>{const target=expeditionPeople().find(t=>t.owner===m.user)||finderTasks().find(t=>t.owner===m.user);return `<div class="member-row">${state.demo?avatar(m.nickname,i):profileAvatar(m.nickname,m.user,m.avatar_url,i)}<div class="member-info"><strong>${esc(m.nickname)}${m.user===state.user.id?'（你）':''}</strong><small>${m.online?'在線':'離線'} · ${memberSharesLocation(m)?'與遠征隊分享中':'未分享即時位置'}</small></div>${target?`<button data-action="task-target" data-id="${esc(target.id)}">尋找</button>`:''}</div>`;}).join('');
   }else{
-    root.innerHTML=(!state.demo?'<button class="button secondary full" data-action="ground-message">原地建立留言</button>':'')+`<p class="field-note">情報點分享給同一遠征隊的隊員。長按地圖可標記地標，選擇限時或永久保留；可由建立者或管理員（隊長）刪除；臨時地標的無效票多於有效票時自動移除，紀錄保留。</p>`+state.pins.filter(match).map(p=>`<article class="pin-row"><div class="pin-row-head"><span class="pin-row-icon">${icon(p.kind==='message'?'message':p.kind==='shop'?'shop':'pin')}</span><div class="pin-row-info"><h2>${esc(p.title)}</h2><p>${esc(pinTypes[p.kind])} · ${p.expires?'限時標記':'永久標記'} · ${esc(p.owner_name||state.user.nickname)}</p><p>${esc(p.description)}</p>${!state.demo?`<div class="pin-author">${profileAvatar(p.owner_name,p.owner,p.owner_avatar_url)}<span>查看發布者檔案</span></div>`:''}<button data-action="pin-target" data-id="${esc(p.id)}">在地圖上尋找 ↗</button>${p.can_delete?`<button class="delete-pin" data-action="delete-pin" data-id="${esc(p.id)}">刪除</button>`:''}</div></div>${landmarkFeedback?.controls(p)||''}</article>`).join('');
+    root.innerHTML=(!state.demo?'<button class="button secondary full" data-action="ground-message">原地建立留言</button>':'')+`<p class="field-note">情報點分享給同一遠征隊的隊員。長按地圖可標記地標，選擇限時或永久保留；可由建立者或管理員（隊長）刪除；臨時地標的無效票多於有效票時自動移除，紀錄保留。</p>`+state.pins.filter(match).map(p=>`<article class="pin-row"><div class="pin-row-head"><span class="pin-row-icon">${icon(p.kind==='message'?'message':p.kind==='shop'?'shop':'pin')}</span><div class="pin-row-info"><h2>${esc(p.title)}</h2><p>${esc(pinTypes[p.kind])} · ${p.expires?'限時標記':'永久標記'} · ${esc(p.owner_name||state.user.nickname)}</p><p>${esc(p.description)}</p>${!state.demo?`<div class="pin-author">${profileAvatar(p.owner_name,p.owner,p.owner_avatar_url)}<span>查看發布者檔案</span></div>`:''}<button data-action="pin-target" data-id="${esc(p.id)}">在地圖上尋找 ↗</button>${p.can_delete?`<button class="delete-pin" data-action="delete-pin" data-id="${esc(p.id)}" ${pendingPinDeletes.has(p.id)?'disabled aria-busy="true"':''}>${pendingPinDeletes.has(p.id)?'刪除中…':'刪除'}</button>`:''}</div></div>${landmarkFeedback?.controls(p)||''}</article>`).join('');
   }
 }
 function renderLocation(){
@@ -544,13 +555,13 @@ async function enterRoom(room,u,{preserveMap=false}={}){
 }
 async function refresh({fresh=false}={}){
   if(state.demo||document.hidden)return;
-  const roomId=state.room.id,userId=state.user.id;
+  const roomId=state.room.id,userId=state.user.id,pinsAtStart=pinRevision;
   if(refreshing){const pending=refreshing;await pending;if((fresh||pending.context!==roomId+':'+userId)&&state.room.id===roomId&&state.user.id===userId)return refresh();return;}
   refreshing=(async()=>{
   try{
     const data=await api(`/expeditions/${roomId}`);
     if(state.demo||state.room.id!==roomId||state.user.id!==userId)return;
-    Object.assign(state,{room:data.room,members:data.members,tasks:data.tasks,pins:data.pins,squads:data.squads,mine:data.me,online:true});lastTeamSyncAt=Date.now();
+    Object.assign(state,{room:data.room,members:data.members,tasks:data.tasks,pins:pinsAtStart===pinRevision?data.pins:state.pins,squads:data.squads,mine:data.me,online:true});lastTeamSyncAt=Date.now();
     assistance?.sync(data.help_rooms||[]);render();
   }catch(e){
     if(state.demo||state.room.id!==roomId||state.user.id!==userId)return;
@@ -593,9 +604,26 @@ async function leaveSquad(id){
   await api(`/expeditions/${roomId}/squads/${encodeURIComponent(id)}/membership`,'DELETE');await refresh({fresh:true});await chat?.sync({fresh:true});
   if(state.room.id===roomId&&state.user.id===userId){setTab('members');toast('已離開小隊，仍保留遠征隊成員資格。');}
 }
+async function deletePin(id){
+  if(pendingPinDeletes.has(id))return;
+  const pin=state.pins.find(item=>item.id===id),roomId=state.room?.id,userId=state.user.id;
+  if(!pin)return;
+  if(!pin.can_delete)throw new Error('只有建立者或遠征隊隊長可以刪除此地標。');
+  const current=()=>!state.demo&&state.room?.id===roomId&&state.user.id===userId;
+  pendingPinDeletes.add(id);render();
+  try{
+    try{await api(`/expeditions/${roomId}/pins/${encodeURIComponent(id)}`,'DELETE');}
+    catch(error){if(error.status!==404)throw error;}
+    if(!current())return;
+    pinRevision++;state.pins=state.pins.filter(item=>item.id!==id);
+    if(state.target?.type==='pin'&&state.target.id===id)state.target=null;
+    render();toast('地標已移除。');
+    await refresh({fresh:true});
+  }finally{pendingPinDeletes.delete(id);if(current())render();}
+}
 function showPublish(type='task',point){
   if(state.demo)return showJoin();
-  const task=type==='task',fixed=task&&!!point,center=point||map?.getCenter()||venue(),roomId=state.room.id;
+  const task=type==='task',fixed=task&&!!point,center=point||map?.getCenter()||venue(),roomId=state.room.id,userId=state.user.id;
   const pos=task&&!fixed?(state.position?{...state.position}:null):{lat:center.lat,lng:center.lng};
   let chosen=pos;
   const description=fixed?'任務旗標固定在你選的地點，不會隨你的定位移動。只有接取任務的人能查看座標。':task?'發布前記錄你目前的位置。任務尚未被接取時，其他隊員看不到座標。':'地標會分享給這支遠征隊的隊員；可由建立者或管理員（隊長）刪除；臨時地標的無效票多於有效票時自動移除，紀錄保留。';
@@ -647,7 +675,7 @@ function showPublish(type='task',point){
   if($('#use-position'))$('#use-position').onclick=async event=>{const b=event.target;b.disabled=true;try{await getPosition();}catch(error){toast(error.code===1?'請允許定位，才能記錄任務發布位置。':error.message||'暫時無法取得位置。');}finally{b.disabled=false;}};
   $('#publish-form').onsubmit=async event=>{
     event.preventDefault();await submit(event.target,async()=>{
-      if(state.demo||state.room?.id!==roomId)throw new Error('遠征隊已變更，請重新選擇地點。');
+      if(state.demo||state.room?.id!==roomId||state.user.id!==userId)throw new Error('遠征隊已變更，請重新選擇地點。');
       const isHelp=task&&new FormData(event.target).get('kind')==='help';
       if(isHelp&&(!helpPoint||Date.now()-helpPoint.timestamp>20000)){try{await form.acquireHelp();}catch{throw new Error('求助需要有效的 GPS 定位，請先允許定位並重試。');}}
       if(isHelp&&!helpPoint)throw new Error('求助需要有效的 GPS 定位。');
@@ -655,10 +683,14 @@ function showPublish(type='task',point){
         try{await getPosition();}catch{throw new Error('發布任務需要目前位置，請允許瀏覽器定位後重試。');}
       }
       const f=new FormData(event.target),body={title:f.get('title'),description:f.get('description'),kind:f.get('kind'),hours:isHelp?6:Number(f.get('hours')),lat:(isHelp?helpPoint:chosen).lat,lng:(isHelp?helpPoint:chosen).lng};
-      if(!form.isConnected||!$('#dialog').open||$('#publish-form')!==form)throw new Error('發布視窗已關閉，請重新開啟後發布。');
+      if(state.demo||state.room?.id!==roomId||state.user.id!==userId||!form.isConnected||!$('#dialog').open||$('#publish-form')!==form)throw new Error('發布視窗或遠征隊已變更，請重新開啟後發布。');
       if(task)body.location_mode=!isHelp&&fixed?'fixed':'publisher';
       if(isHelp){body.help_broadcast=true;body.accuracy=helpPoint.accuracy;state.position={lat:helpPoint.lat,lng:helpPoint.lng,accuracy:helpPoint.accuracy};lastPositionAt=helpPoint.timestamp;}
-      await api(`/expeditions/${roomId}/${task?'tasks':'pins'}`,'POST',body);await refresh();
+      await api(`/expeditions/${roomId}/${task?'tasks':'pins'}`,'POST',body);
+      if(state.demo||state.room?.id!==roomId||state.user.id!==userId)return;
+      if(!task)pinRevision++;
+      await refresh({fresh:true});
+      if(state.demo||state.room?.id!==roomId||state.user.id!==userId||!form.isConnected||$('#publish-form')!==form)return;
       closeDialog();setTab(task?'tasks':'pins');toast(isHelp?'求助已發布，全遠征隊可查看即時位置；刪除求助後才停止分享。':fixed?'任務旗標已插在選定地點；接取者可查看。':task?'任務已發布；只有接取者能取得你的座標。':body.hours?'限時地標已分享，到期後會自動隱藏。':'永久地標已分享給遠征隊。');
     });
   };
@@ -766,7 +798,7 @@ async function taskAction(id,action){
   try{
     const t=state.tasks.find(x=>x.id===id);if(!t)return;
     if(state.demo){if(action==='accept'){t.status='accepted';t.assignee='me';t.assignee_name='你';}else if(action==='release'){t.status='open';t.assignee=null;}else t.status=action==='complete'?'done':'cancelled';render();}
-    else{await api(`/expeditions/${state.room.id}/tasks/${id}/${action}`,'POST',{});await refresh();}
+    else{await api(`/expeditions/${state.room.id}/tasks/${id}/${action}`,'POST',{});await refresh({fresh:true});}
     if(action==='accept'){selectTarget('task',id);toast(state.demo?'演示接取成功！方向提示已開啟。':'已接取任務，地圖正指向發布者。');}
     else toast(action==='cancel'&&t.help_active?(assistance?.active?'求助已刪除；其他求助仍持續分享定位。':'求助已刪除，已停止求助定位分享。'):{release:'已放棄接取。',complete:'任務完成，謝謝你的支援！',cancel:'任務已撤回。'}[action]);
   }catch(e){toast(e.message);}finally{state.pending=false;}
@@ -840,7 +872,7 @@ document.addEventListener('click',async e=>{
     else if(action==='copy'){try{await navigator.clipboard.writeText(b.dataset.copy);toast('邀請連結已複製。');}catch{toast('無法自動複製，請選取上方邀請連結。');}}
     else if(action==='venue'){showMap();switchVenue(id);}
     else if(action==='switch-room'){const r=state.rooms.find(r=>r.id===id);closeDialog();await enterRoom(r,state.user);showMap();}
-    else if(action==='delete-pin'){if(state.demo){state.pins=state.pins.filter(p=>p.id!==id);render();}else{await api(`/expeditions/${state.room.id}/pins/${id}`,'DELETE');await refresh();}toast('地標已刪除。');}
+    else if(action==='delete-pin')await deletePin(id);
     else if(action==='leave'){dialog('<h2>結束這一段遠征？</h2><p>退出會撤回你未完成的任務，並放棄已接取的任務。已開啟的好友分享會繼續。持有邀請碼仍可重新加入。</p><button class="button primary full" data-action="confirm-leave">確認退出遠征隊</button><button class="button outline full" data-action="close">留下來</button>');}
     else if(action==='confirm-leave'){await stopTeamLocation();const departure=await api(`/expeditions/${state.room.id}/membership`,'DELETE');assistance?.sync(departure.help_rooms||[]);closeDialog();resetLobby();render();showMap();focusRegion();try{localStorage.removeItem('tamago-room');}catch{}toast('已退出遠征隊。');}
   }catch(error){toast(error.message);}
@@ -888,7 +920,7 @@ async function init(){
   icons();
   groundMessages=new GroundMessages({
     context:()=>!state.demo&&state.authenticated?{room:state.room.id,user:state.user.id}:null,
-    join:()=>showJoin(),dialog,close:closeDialog,submit,api,refresh,toast,
+    join:()=>showJoin(),dialog,close:closeDialog,submit,api,refresh:()=>{pinRevision++;return refresh({fresh:true});},toast,
     center:point=>{showPositionOnMap(point);renderMap();},select:id=>selectTarget('pin',id)
   });
   news=new NewsBoard($('#news-dialog'),$('#news-launcher'),{
@@ -900,7 +932,7 @@ async function init(){
     friends:()=>friends.ownerId===state.user.id&&friends.ready()?friends.data:null,news:()=>news.open('friends')
   });
   profilePage=new ProfileClient($('#profile-dialog'),{api,toast,user:()=>state.authenticated?state.user:null,login:uid=>{authIntent={kind:'profile',uid};showAuth();},settings:showAccount,expired:()=>friends?.actions.expired(),updated:profile=>{state.user={...state.user,...profile};render();},room:id=>openProfileRoom(id),pin:(eid,pid)=>openProfileRoom(eid,pid),removeRoom:id=>showDeleteRoom(id)});
-  landmarkFeedback=new LandmarkFeedback({api,toast,context:()=>({eid:state.room.id,pins:state.pins}),changed:()=>render()});
+  landmarkFeedback=new LandmarkFeedback({api,toast,context:()=>({eid:state.room.id,user:state.user.id,pins:state.pins}),committed:()=>{pinRevision++;},changed:()=>render()});
   appDisplay=new AppDisplay({dialog,close:closeDialog,toast});
   chat=new ChatClient($('#chat-dialog'),{api,toast,user:()=>state.authenticated?state.user:null,login:()=>{authIntent={kind:'chat'};showAuth();},expired:()=>friends?.actions.expired(),person:id=>chatFriend.open(id)});
   mapActions=new MapActions($('#map'),$('#map-actions'),{
