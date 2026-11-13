@@ -48,10 +48,14 @@ let centerOnLocationFix=true;
 let visibleTeammateKey='';
 const directionNeedle='<svg class="direction-needle" viewBox="0 0 24 24" aria-hidden="true"><path class="needle-main" d="M12 2 21 21 12 16 3 21Z"/><path class="needle-highlight" d="M12 2V16L3 21Z"/></svg>';
 let limitMapRegion=true;
-let peopleFilter='all';
-const peopleFilterLabels={all:'所有人',friends:'好友',expedition:'遠征隊成員',squad:'隊友'};
+let peopleFilter='friends';
+const peopleFilterLabels={friends:'好友',expedition:'遠征隊成員',squad:'隊友'};
 try{limitMapRegion=localStorage.getItem('tamago-limit-region')!=='off';}catch{}
-try{const saved=localStorage.getItem('tamago-people-filter');if(Object.hasOwn(peopleFilterLabels,saved))peopleFilter=saved;}catch{}
+try{
+  const saved=localStorage.getItem('tamago-people-filter');
+  if(Object.hasOwn(peopleFilterLabels,saved))peopleFilter=saved;
+  localStorage.setItem('tamago-people-filter',peopleFilter);
+}catch{}
 
 function finderTasks(){
   if(state.demo||!state.authenticated||!state.online||document.hidden||!lastTeamSyncAt||Date.now()-lastTeamSyncAt>20000)return [];
@@ -72,22 +76,24 @@ function memberSharesLocation(member){
 }
 function navigationTargets(){return [...sharedPeople(),...finderTasks()];}
 function matchesPeopleFilter(person,value=peopleFilter){
-  if(value==='all')return true;
+  if(!Object.hasOwn(peopleFilterLabels,value))return false;
   if(value==='friends')return friends?.data.friends.some(p=>p.id===person.owner)||false;
   const member=state.members.find(m=>m.user===person.owner);
   return value==='expedition'?!!member:!!member&&!!state.mine.squad&&member.squad===state.mine.squad;
 }
 function visiblePeople(){return navigationTargets().filter(p=>matchesPeopleFilter(p));}
 function renderPeopleFilter(){
-  for(const [value,label] of Object.entries(peopleFilterLabels)){
+  const blocked=$('#people-filter input[value="all"]');
+  blocked.disabled=true;blocked.checked=false;
+  for(const value of Object.keys(peopleFilterLabels)){
     $(`#people-filter input[value="${value}"]`).checked=peopleFilter===value;
     $(`[data-people-count="${value}"]`).textContent=new Set(navigationTargets().filter(p=>matchesPeopleFilter(p,value)&&inRegion(p)).map(p=>p.owner)).size;
   }
   $('#people-filter-handle').setAttribute('aria-label','開啟地圖人物篩選，目前：'+peopleFilterLabels[peopleFilter]);
-  $('#people-filter-handle').classList.toggle('is-filtered',peopleFilter!=='all');
+  $('#people-filter-handle').classList.add('is-filtered');
 }
 function setPeopleFilter(value){
-  if(!Object.hasOwn(peopleFilterLabels,value))return;
+  if(!Object.hasOwn(peopleFilterLabels,value)){renderPeopleFilter();return;}
   peopleFilter=value;try{localStorage.setItem('tamago-people-filter',value);}catch{}renderMap();
 }
 function openPeopleFilter(focus=false){
@@ -105,7 +111,10 @@ function renderFinder(){
 }
 function showFinderTaskOnMap(id){
   const target=navigationTargets().find(t=>t.id===id);if(!target)return;
-  if(!matchesPeopleFilter(target))setPeopleFilter('all');
+  if(!matchesPeopleFilter(target)){
+    const filter=Object.keys(peopleFilterLabels).find(value=>matchesPeopleFilter(target,value));
+    if(filter)setPeopleFilter(filter);
+  }
   if(['friend','member'].includes(target.kind)){showPositionOnMap(target);renderMap();return;}
   showMap();if(map&&inRegion(target))map.setView([target.lat,target.lng],Math.max(map.getMinZoom(),17));
   else toast('目標在一公里外，可關閉「1 km 範圍」查看地圖位置。');
