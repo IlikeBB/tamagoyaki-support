@@ -4,7 +4,7 @@ const browser=await chromium.launch({headless:true,executablePath:'C:/Program Fi
 const errors=[],writes=[],checks=[];
 try{
  const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
- const page=await context.newPage();const openNews=async()=>{await page.locator('#squad-launcher').focus();await page.evaluate(()=>news.open());};let newsMode='real',fixtures=[];
+ const page=await context.newPage();const openNews=async()=>{await page.locator('#settings-launcher').focus();await page.evaluate(()=>news.open());};let newsMode='real',fixtures=[];
  page.on('pageerror',e=>errors.push(e.message.replace(/AIza[A-Za-z0-9_-]+/g,'[REDACTED]')));
  await page.route('**/api/**',async route=>{
   const request=route.request(),url=new URL(request.url());if(url.origin!==origin)return route.continue();
@@ -23,18 +23,18 @@ try{
   return route.fulfill({json:{announcements:fixtures}});
  });
  await page.goto(origin);await expect.poll(()=>page.evaluate(()=>!!map),{timeout:30000}).toBe(true);
- await expect(page.locator('#squad-launcher')).toBeVisible();await expect(page.locator('#news-launcher')).toBeHidden();await expect(page.locator('#news-launcher .news-unread')).toHaveJSProperty('hidden',false);
+ await expect(page.locator('#settings-launcher')).toBeVisible();await expect(page.locator('#news-launcher')).toBeHidden();await expect(page.locator('#news-launcher .news-unread')).toHaveJSProperty('hidden',false);
  await openNews();await expect(page.locator('#news-dialog')).toBeVisible();
  await expect(page.locator('#news-list')).toContainText('「所有人」位置篩選暫停使用');await expect(page.locator('#news-launcher .news-unread')).toHaveJSProperty('hidden',true);
  const publishedCount=await page.locator('.news-item').count();expect(publishedCount).toBeGreaterThan(0);
  await page.locator('[data-news-filter=event]').click();await expect(page.locator('#news-list')).toContainText('目前沒有活動公告');
- await page.keyboard.press('Escape');await expect(page.locator('#news-dialog')).toBeHidden();await expect(page.locator('#squad-launcher')).toBeFocused();
+ await page.keyboard.press('Escape');await expect(page.locator('#news-dialog')).toBeHidden();await expect(page.locator('#settings-launcher')).toBeFocused();
  await page.reload();await expect.poll(()=>page.evaluate(()=>!!map),{timeout:30000}).toBe(true);await expect(page.locator('#news-launcher .news-unread')).toHaveJSProperty('hidden',true);
  checks.push('public announcement feed still supports read-only access; real update is published; unread clears on reading and persists across reload');
  for(const width of [320,390,768,1024,1440]){
   await page.setViewportSize({width,height:844});
   await page.evaluate(()=>{document.querySelector('#account-label').textContent='超長的測試帳號名稱';});
-  const launcher=await page.locator('#squad-launcher').boundingBox(),header=await page.locator('.app-header').boundingBox();
+  const launcher=await page.locator('#settings-launcher').boundingBox(),header=await page.locator('.app-header').boundingBox();
   expect(launcher.x).toBeGreaterThanOrEqual(0);expect(launcher.x+launcher.width).toBeLessThanOrEqual(width);
   expect(launcher.y).toBeGreaterThanOrEqual(header.y);expect(launcher.y+launcher.height).toBeLessThanOrEqual(header.y+header.height);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
@@ -65,7 +65,7 @@ try{
  newsMode='fixture';fixtures=[];await page.locator('#news-retry').click();await expect(page.locator('#news-list')).toContainText('目前沒有公告');await expect(page.locator('#news-retry')).toBeHidden();
  await page.locator('#news-close').click();newsMode='malformed';await openNews();await expect(page.locator('#news-status')).toContainText('公告暫時無法載入');
  newsMode='real';await page.locator('#news-retry').click();await expect(page.locator('.news-item')).toHaveCount(publishedCount);
- await page.keyboard.press('Escape');await expect(page.locator('#squad-launcher')).toBeFocused();
+ await page.keyboard.press('Escape');await expect(page.locator('#settings-launcher')).toBeFocused();
  checks.push('empty feed, network errors, malformed feed and successful retry remain usable; closing restores focus');
  expect(errors).toEqual([]);expect(writes).toEqual([]);console.log(JSON.stringify({ok:true,origin,checks,errors,writes}));
 }finally{await browser.close();}

@@ -42,9 +42,9 @@ try{
  await page.evaluate(()=>{lastPositionAt=Date.now();state.heading=330;renderMap();});
  await page.locator('.friend-map-point').click();await expect(page.locator('#finder-source')).toContainText('好友即時位置');await page.locator('#finder-close').click();
  await page.locator('.expedition-map-point').locator('..').press('Enter');await expect(page.locator('#finder-source')).toContainText('遠征隊即時位置');await page.locator('#finder-close').click();await page.locator('.expedition-map-point').locator('..').press('Space');await expect(page.locator('#teammate-finder')).toBeVisible();await page.locator('#finder-close').click();
- await expect(page.locator('.help-map-marker')).toHaveCount(1);expect(await page.locator('.help-map-marker').evaluate(e=>getComputedStyle(e).backgroundColor)).toBe('rgb(187, 41, 36)');await expect(page.locator('#people-filter input[value=all]')).toBeDisabled();
- await page.evaluate(()=>setPeopleFilter('friends'));await expect(page.locator('.friend-map-point')).toHaveCount(1);await expect(page.locator('.expedition-map-point')).toHaveCount(0);await page.evaluate(()=>setPeopleFilter('expedition'));
- checks.push('stale own GPS suppresses heading and labels estimated bearings; pointer and keyboard open finder; red help symbol and privacy filters remain intact');
+ await expect(page.locator('.help-map-marker')).toHaveCount(1);expect(await page.locator('.help-map-marker').evaluate(e=>getComputedStyle(e).backgroundColor)).toBe('rgb(187, 41, 36)');await expect(page.locator('#people-filter')).toHaveCount(0);
+ await expect(page.locator('.friend-map-point')).toHaveCount(1);await expect(page.locator('.expedition-map-point')).toHaveCount(1);
+ checks.push('stale own GPS suppresses heading and labels estimated bearings; pointer and keyboard open finder; red help symbol and authorized positions remain intact');
  for(const width of [320,390,768,1024,1440]){
   await page.setViewportSize({width,height:width<700?844:900});await page.evaluate(point=>map.setView(point,16,{animate:false}),own);await page.waitForTimeout(600);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await expect(page.locator('.self-map-point .presence-fan')).toHaveAttribute('data-angle','330');

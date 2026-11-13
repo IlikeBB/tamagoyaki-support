@@ -1,0 +1,9 @@
+.pin-filter-handle{position:absolute;z-index:12;left:0;top:38%;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:28px;min-height:64px;padding:10px 5px;background:var(--surface);color:var(--green);border:1px solid var(--line);border-left:0;border-radius:0 8px 8px 0;font-size:11px;box-shadow:var(--shadow)}
+.pin-filter-handle.is-filtered{background:var(--green);color:var(--surface)}
+.pin-filter-panel{position:absolute;z-index:13;left:12px;top:100px;width:260px;max-width:calc(100% - 24px);padding:16px;border:1px solid var(--line);border-radius:10px;background:var(--surface);box-shadow:var(--shadow);pointer-events:auto}
+.pin-filter-panel[hidden]{display:none}
+.pin-filter-heading{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px}
+.pin-filter-heading button{min-width:44px;min-height:44px;font-size:22px}
+.pin-filter-panel .pin-filter-choice{display:flex;align-items:center;gap:10px;min-height:44px;font-size:13px;cursor:pointer}
+.pin-filter-choice input{width:20px;height:20px;margin:0;accent-color:var(--green);flex:none}
+.pin-filter-panel p{font-size:11px;color:var(--muted);margin:12px 0 0}

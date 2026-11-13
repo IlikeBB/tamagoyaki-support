@@ -40,7 +40,7 @@ class SquadsTest(test_app.RendezvousTest):
     def test_switching_clears_regular_location_and_keeps_friend_sharing(self):
         first=self.create(self.a,'第一隊')
         self.assertEqual(self.b.post(self.path+'/squads/join',json={'code':first['code']}).status_code,200)
-        self.a.put(self.path+'/location',json={'scope':'expedition','lat':25.033,'lng':121.5654,'accuracy':10})
+        self.a.put(self.path+'/location',json={'scope':'squad','squad_id':first['id'],'lat':25.033,'lng':121.5654,'accuracy':10})
         self.create(self.a,'第二隊')
         mine=self.snapshot(self.a)['me']
         self.assertEqual(mine['scope'],'off')

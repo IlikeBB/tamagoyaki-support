@@ -1,0 +1,16 @@
+.map-bottom .target-card.has-reports{width:340px;max-width:calc(100% - 48px);max-height:min(560px,calc(var(--app-height,100dvh) - 340px));overflow:auto;overscroll-behavior:contain}
+.landmark-report-board{border-top:1px solid var(--line);margin-top:12px;padding-top:12px}
+.report-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.report-heading h3{font-size:14px;margin:0}
+.report-heading button,.report-item>button,.report-remove button{min-height:44px;font-size:12px;color:var(--green);text-decoration:underline}
+.report-form textarea{min-height:76px;font-size:16px;margin:0 0 8px;resize:vertical}
+.report-form .button{min-height:44px;width:100%;font-size:12px}
+.report-status,.report-empty{font-size:11px;color:var(--muted);overflow-wrap:anywhere;margin:8px 0}
+.report-feed{max-height:220px;overflow:auto;overscroll-behavior:contain}
+.report-item{padding:12px 0;border-top:1px solid var(--line)}
+.report-author{display:flex;align-items:center;gap:6px;font-size:11px}
+.report-author strong{overflow-wrap:anywhere;min-width:0}
+.report-author time{color:var(--muted);font-size:10px;margin-left:auto;flex-shrink:0}
+.report-item>p{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.8;margin:8px 0 0}
+.report-remove{display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:11px}
+.target-summary .landmark-feedback{margin-top:8px;padding-top:8px}

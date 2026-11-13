@@ -34,6 +34,11 @@ class Reputation:
               PRIMARY KEY(pin,voter)
             );
             CREATE INDEX IF NOT EXISTS landmark_reviews_voter ON landmark_reviews(voter,updated);
+            CREATE TABLE IF NOT EXISTS landmark_follows (
+              follower TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              author TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              created INTEGER NOT NULL,PRIMARY KEY(follower,author),CHECK(follower<>author)
+            );
             ''')
             c.execute('BEGIN IMMEDIATE')
             columns={row['name'] for row in c.execute('PRAGMA table_info(landmark_records)')}
@@ -48,6 +53,9 @@ class Reputation:
               WHERE p.expires IS NOT NULL GROUP BY p.id HAVING SUM(v.value)<0)''')
             c.execute('''DELETE FROM pins WHERE expires IS NOT NULL AND id IN (
               SELECT pin FROM landmark_records WHERE invalidated=1)''')
+            c.execute('''INSERT OR IGNORE INTO landmark_follows
+              SELECT v.voter,r.owner,MIN(v.created) FROM landmark_reviews v JOIN landmark_records r ON r.pin=v.pin
+              WHERE v.value=1 AND v.voter<>r.owner GROUP BY v.voter,r.owner''')
 
     @staticmethod
     def record(c, pin):
@@ -70,9 +78,13 @@ class Reputation:
         return dict(row)
 
     def annotate(self, c, pins, uid):
+        followed={r['author'] for r in c.execute('SELECT author FROM landmark_follows WHERE follower=?',(uid,))}
+        reported={r['pin'] for r in c.execute('SELECT DISTINCT pin FROM landmark_reports WHERE owner=?',(uid,))}
         for pin in pins:
             pin.update(self.pin_votes(c,pin['id'],uid))
             pin['can_vote']=(pin['expires'] is None or pin['expires']>int(time.time())) and pin['owner']!=uid
+            pin['following_author']=pin['owner'] in followed
+            pin['reported_by_me']=pin['id'] in reported
 
     def install(self, app):
         @app.put('/api/expeditions/{eid}/pins/{pid}/vote')
@@ -96,6 +108,8 @@ class Reputation:
                     if body.value:
                         c.execute('''INSERT INTO landmark_reviews VALUES(?,?,?,?,?) ON CONFLICT(pin,voter)
                           DO UPDATE SET value=excluded.value,updated=excluded.updated''',(pid,uid,body.value,stamp,stamp))
+                        if body.value==1:
+                            c.execute('INSERT OR IGNORE INTO landmark_follows VALUES(?,?,?)',(uid,pin['owner'],stamp))
                     else:c.execute('DELETE FROM landmark_reviews WHERE pin=? AND voter=?',(pid,uid))
                 result={'ok':True}
                 if pin:
@@ -105,5 +119,5 @@ class Reputation:
                         c.execute('UPDATE landmark_records SET invalidated=1 WHERE pin=?',(pid,))
                         c.execute('DELETE FROM pins WHERE id=?',(pid,))
                     if member and (pin['expires'] is None or pin['expires']>stamp):
-                        result.update(feedback,removed=removed)
+                        result.update(feedback,removed=removed,following_author=bool(c.execute('SELECT 1 FROM landmark_follows WHERE follower=? AND author=?',(uid,pin['owner'])).fetchone()))
                 return result

@@ -85,8 +85,8 @@ class ProfileClient {
     const item=this.items.find(item=>item.id===id&&item.can_delete);if(!item)return;
     const operation={id,uid:this.uid,generation:this.generation};this.contentDeletion=operation;this.recordRequest++;this.loadingRecords=false;this.renderContent();
     try{
-      try{await this.actions.api('/profiles/me/content/'+encodeURIComponent(id),'DELETE');}catch(error){if(error.status!==404)throw error;}
-      this.actions.contentDeleted(item.expedition,id,operation.uid);
+      try{await this.actions.api('/profiles/me/content/'+encodeURIComponent(id)+(item.source==='report'?'?source=report':''),'DELETE');}catch(error){if(error.status!==404)throw error;}
+      this.actions.contentDeleted(item.expedition,id,operation.uid,item.source||'pin',item.parent_pin);
       if(operation.generation!==this.generation||operation.uid!==this.uid)return;
       this.contentConfirmation=null;
       if(ProfileContentView.managed(this.tab)&&!this.editing){

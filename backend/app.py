@@ -26,6 +26,7 @@ from .reputation import Reputation
 from .profile_media import ProfileMedia
 from .profiles import Profiles
 from .profile_content import ProfileContent
+from .landmark_reports import LandmarkReports
 from .task_feedback import TaskFeedback
 from .squad_invites import SquadInvites
 
@@ -98,6 +99,7 @@ task_feedback = TaskFeedback(connect, accounts)
 profile_media = ProfileMedia(connect, accounts)
 profiles = Profiles(connect, accounts, profile_media, reputation, ACTIVITY_VENUES,task_feedback)
 profile_content = ProfileContent(connect,accounts,reputation)
+landmark_reports = LandmarkReports(connect,accounts,profile_media)
 
 
 def prune_empty_squads(c, eid=None):
@@ -165,9 +167,12 @@ def init_db():
     with connect() as c:
         prune_empty_squads(c)
     reputation.migrate()
+    landmark_reports.migrate()
     task_feedback.migrate()
     profile_media.migrate()
     profiles.migrate()
+    with connect() as c:
+        c.execute("UPDATE members SET scope='off',lat=NULL,lng=NULL,accuracy=NULL,located=NULL WHERE scope='expedition'")
 
 
 def cleanup():
@@ -207,6 +212,7 @@ task_feedback.install(app)
 profile_media.install(app)
 profiles.install(app)
 profile_content.install(app)
+landmark_reports.install(app)
 limits = defaultdict(deque)
 last_prune = 0
 
@@ -307,6 +313,13 @@ class Position(Input):
 class Location(Position):
     accuracy: float = Field(ge=0, le=100000, allow_inf_nan=False)
     scope: Literal["task", "expedition", "squad"]
+    squad_id: str | None = Field(default=None,min_length=1,max_length=64,pattern=r'^[A-Za-z0-9_-]+$')
+
+
+class SharedLocation(Position):
+    accuracy: float = Field(ge=0,le=100000,allow_inf_nan=False)
+    scope: Literal['friends_squad'] = 'friends_squad'
+    expedition_id: str | None = Field(default=None,min_length=1,max_length=64,pattern=r'^[A-Za-z0-9_-]+$')
     squad_id: str | None = Field(default=None,min_length=1,max_length=64,pattern=r'^[A-Za-z0-9_-]+$')
 
 
@@ -502,7 +515,7 @@ def snapshot(eid: str, request: Request):
             private_positions[p['user']] = dict(p)
             p["online"] = p["seen"] >= stamp-40
             # Membership alone never opts a user into location sharing.
-            audience = p['scope']=='expedition' or (p['scope']=='squad' and mine['squad'] is not None and p['squad']==mine['squad'])
+            audience = p['scope']=='squad' and mine['squad'] is not None and p['squad']==mine['squad']
             visible = (p['user'] != u['id'] and audience
                        and p['located'] is not None and p['located'] >= stamp-LOCATION_TTL_SECONDS)
             p['location_visible'] = visible
@@ -541,7 +554,7 @@ def snapshot(eid: str, request: Request):
                     task.update(lat=help_point['lat'],lng=help_point['lng'],accuracy=help_point['accuracy'],located=help_point['located'],location_source='help')
                 elif task['location_mode'] == 'fixed':
                     task.update(location_source='fixed',located=task['created'])
-                elif position and (position['scope'] in ('task','expedition') or
+                elif position and (position['scope']=='task' or
                       position['scope']=='squad' and (task['owner']==u['id'] or mine['squad'] is not None and position['squad']==mine['squad'])) and position['located'] is not None and position['located']>=stamp-LOCATION_TTL_SECONDS:
                     task.update(lat=position['lat'],lng=position['lng'],accuracy=position['accuracy'],located=position['located'],location_source='live' if position['located']>=stamp-LIVE_SECONDS else 'last_known')
                 else:
@@ -610,6 +623,8 @@ def locate(eid: str, body: Location, request: Request):
     u, m = member(request,eid)
     with connect() as c:
         c.execute('BEGIN IMMEDIATE')
+        if body.scope=='expedition':
+            raise HTTPException(409,'一般定位已改為好友與小隊分享，請重新開啟定位設定。')
         # Recheck membership inside the write transaction, including concurrent exits.
         current=c.execute('SELECT * FROM members WHERE user=? AND expedition=?',(u['id'],eid)).fetchone()
         if not current:
@@ -625,6 +640,28 @@ def locate(eid: str, body: Location, request: Request):
         c.execute("UPDATE members SET scope='off',lat=NULL,lng=NULL,accuracy=NULL,located=NULL WHERE user=? AND expedition<>?",(u['id'],eid))
         c.execute("UPDATE members SET lat=?,lng=?,accuracy=?,scope=?,located=?,seen=? WHERE user=? AND expedition=?", (body.lat,body.lng,body.accuracy,body.scope,now(),now(),u["id"],eid))
     return {"ok":True}
+
+
+@app.put('/api/location')
+def share_with_friends_and_squad(body: SharedLocation,request: Request):
+    uid=user(request)['id']
+    with connect() as c:
+        c.execute('BEGIN IMMEDIATE')
+        if assistance.required(c,uid):
+            raise HTTPException(409,'求助期間須維持求助定位；請先刪除求助任務。')
+        if bool(body.expedition_id)!=bool(body.squad_id):
+            raise HTTPException(409,'小隊已變更，請重新整理後再分享。')
+        if body.squad_id and not c.execute('''SELECT 1 FROM members m JOIN squads s ON s.id=m.squad AND s.expedition=m.expedition
+          WHERE m.user=? AND m.expedition=? AND m.squad=?''',(uid,body.expedition_id,body.squad_id)).fetchone():
+            raise HTTPException(409,'小隊已變更，請重新整理後再分享。')
+        stamp=now()
+        c.execute("UPDATE members SET scope='off',lat=NULL,lng=NULL,accuracy=NULL,located=NULL WHERE user=?",(uid,))
+        c.execute('''INSERT INTO friend_locations VALUES(?,?,?,?,?) ON CONFLICT(user) DO UPDATE SET
+          lat=excluded.lat,lng=excluded.lng,accuracy=excluded.accuracy,located=excluded.located''',(uid,body.lat,body.lng,body.accuracy,stamp))
+        if body.squad_id:
+            c.execute("UPDATE members SET scope='squad',lat=?,lng=?,accuracy=?,located=?,seen=? WHERE user=? AND expedition=? AND squad=?",
+              (body.lat,body.lng,body.accuracy,stamp,stamp,uid,body.expedition_id,body.squad_id))
+    return {'ok':True}
 
 
 @app.delete("/api/expeditions/{eid}/location")

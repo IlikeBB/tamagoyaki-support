@@ -27,16 +27,16 @@ async function scenario(scope){
   if(path==='/api/me')return route.fulfill({json:{user,expeditions:[room],help_rooms:[]}});
   if(path==='/api/chat')return route.fulfill({json:{conversations:[],unread:0}});
   if(path==='/api/friends')return route.fulfill({json:{friends:[{id:'friend',nickname:'小狐',username:'fox',lat:25.034,lng:121.564,accuracy:8,located:observed,location_visible:true}],incoming:[],outgoing:[],sharing:false}});
-  if(path==='/api/expeditions/'+room.id)return route.fulfill({json:{room,me:{user:user.id,scope:'off',squad:scope==='squad'?'background-squad':null},members:[{user:'member',nickname:'阿晴',lat:25.034,lng:121.567,accuracy:9,located:observed,scope:'expedition',location_visible:true,online:true}],squads:scope==='squad'?[{id:'background-squad',name:'同行小隊',code:'SQUAD123'}]:[],pins:[],help_rooms:[],tasks:[{id:'task',title:'交換手辦',owner:user.id,owner_name:'測試者',kind:'trade',status:'open',lat:25.033,lng:121.5654,expires:observed+3600,location_visible:true,location_source:'published',created:observed,location_mode:'publisher'}]}});
+  if(path==='/api/expeditions/'+room.id)return route.fulfill({json:{room,me:{user:user.id,scope:'off',squad:['squad','friends_squad'].includes(scope)?'background-squad':null},members:[{user:'member',nickname:'阿晴',lat:25.034,lng:121.567,accuracy:9,located:observed,scope:'squad',location_visible:true,online:true}],squads:['squad','friends_squad'].includes(scope)?[{id:'background-squad',name:'同行小隊',code:'SQUAD123'}]:[],pins:[],help_rooms:[],tasks:[{id:'task',title:'交換手辦',owner:user.id,owner_name:'測試者',kind:'trade',status:'open',lat:25.033,lng:121.5654,expires:observed+3600,location_visible:true,location_source:'published',created:observed,location_mode:'publisher'}]}});
   if(path==='/api/config')return route.continue();
   return route.fulfill({status:404,json:{detail:'No mocked endpoint'}});
  });
  await page.goto(origin);await expect.poll(()=>page.evaluate(()=>!!map&&!state.demo&&friends.ready())).toBe(true);
  await page.evaluate(value=>{showLocation();document.querySelector('#location-scope-'+value).checked=true;document.querySelector('#location-form').requestSubmit();},scope);
  await expect.poll(()=>page.evaluate(()=>state.watch!=null)).toBe(true);await page.evaluate(()=>__sample());
- const path=scope==='friends'?'/api/friends/location':'/api/expeditions/'+room.id+'/location';
+ const path=scope==='friends'?'/api/friends/location':scope==='friends_squad'?'/api/location':'/api/expeditions/'+room.id+'/location';
  await expect.poll(()=>requests.filter(r=>r.method==='PUT'&&r.path===path).length).toBe(1);
- if(scope==='squad')expect(requests.find(r=>r.method==='PUT').body.squad_id).toBe('background-squad');
+ if(['squad','friends_squad'].includes(scope))expect(requests.find(r=>r.method==='PUT').body.squad_id).toBe('background-squad');
  const before=requests.filter(r=>r.method==='DELETE').length,clears=await page.evaluate(()=>__clears);
  await page.evaluate(()=>__background(true));await page.waitForTimeout(100);
  expect(requests.filter(r=>r.method==='DELETE').length).toBe(before);expect(await page.evaluate(()=>__clears)).toBe(clears);
@@ -59,7 +59,7 @@ async function scenario(scope){
  await context.close();checks.push(scope+': background keeps watch and accepts actual fixes; transient failure retains; foreground requests GPS; repeated samples do not renew; last-known age shown; 15-minute expiry; denied permission withdraws');
 }
 try{
- for(const scope of ['friends','expedition','task','squad'])await scenario(scope);
+ for(const scope of ['friends','friends_squad','task','squad'])await scenario(scope);
  // Help watch retries temporary failures without withdrawing last known coords.
  const context=await browser.newContext();const page=await context.newPage();await page.goto(origin);await expect.poll(()=>page.evaluate(()=>typeof AssistanceClient)).toBe('function');
  const help=await page.evaluate(async()=>{

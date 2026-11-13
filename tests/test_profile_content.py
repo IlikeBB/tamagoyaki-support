@@ -1,3 +1,5 @@
+import concurrent.futures
+import secrets
 from fastapi.testclient import TestClient
 from tests import test_app
 
@@ -56,3 +58,69 @@ class ProfileContentTest(test_app.RendezvousTest):
         self.assertEqual(self.b.get(self.base+'?kind=message').json()['total'],0)
         with self.module.connect() as db:
             self.assertEqual(db.execute('SELECT owner FROM landmark_records WHERE pin=?',(message['id'],)).fetchone()['owner'],bid)
+
+    def test_landmark_reports_membership_nonce_validation_and_no_gps(self):
+        pin=self.create(hours=0);path=self.path+'/pins/'+pin['id']+'/reports';body={'body':'排隊約十分鐘 <script>x</script>','client_id':secrets.token_hex(16)}
+        self.assertEqual(self.outsider.get(path).status_code,403);self.assertEqual(self.outsider.post(path,json=body).status_code,403)
+        with concurrent.futures.ThreadPoolExecutor() as pool:responses=list(pool.map(lambda _:self.b.post(path,json=body),range(2)))
+        self.assertTrue(all(response.status_code==200 for response in responses));self.assertEqual(responses[0].json()['id'],responses[1].json()['id'])
+        data=self.c.get(path).json();self.assertEqual(data['total'],1);self.assertFalse(data['items'][0]['can_delete']);self.assertEqual(data['items'][0]['body'],body['body'])
+        self.assertFalse(set(data['items'][0])&{'lat','lng','accuracy','located','client_id'})
+        self.assertEqual(self.b.post(path,json={**body,'body':'改寫內容'}).status_code,409)
+        self.assertEqual(self.b.post(path,json={**body,'body':'  '}).status_code,422)
+        self.assertEqual(self.b.post(path,json={**body,'body':'x'*601}).status_code,422)
+        self.assertEqual(self.b.post(path,json={**body,'lat':25}).status_code,422)
+        self.assertTrue(all(row['lat'] is None for row in self.snapshot(self.c)['members']))
+        self.assertEqual(self.snapshot(self.b)['me']['scope'],'off')
+        self.b.delete(self.path+'/membership');self.assertEqual(self.b.post(path,json=body).status_code,403)
+
+    def test_report_management_survives_parent_deletion_and_preserves_xp(self):
+        pin=self.create(hours=0);path=self.path+'/pins/'+pin['id']+'/reports'
+        report=self.b.post(path,json={'body':'還有特典可以領取','client_id':secrets.token_hex(16)}).json()
+        self.assertEqual(self.c.delete(path+'/'+report['id']).status_code,403)
+        managed=self.b.get(self.base+'?kind=message').json()['items'][0]
+        self.assertEqual(managed['source'],'report');self.assertEqual(managed['parent_pin'],pin['id']);self.assertTrue(managed['can_view'])
+        self.assertEqual(self.a.delete(self.base+'/'+report['id']+'?source=report').status_code,404)
+        self.b.put(self.path+'/pins/'+pin['id']+'/vote',json={'value':1});before=self.a.get('/api/profiles/me').json()['rpg']
+        self.a.delete(self.path+'/pins/'+pin['id']);self.assertEqual(self.b.get(path).status_code,404)
+        managed=self.b.get(self.base+'?kind=message').json()['items'][0];self.assertTrue(managed['parent_removed']);self.assertFalse(managed['can_view'])
+        self.b.delete(self.path+'/membership');self.assertEqual(self.b.delete(self.base+'/'+report['id']+'?source=report').status_code,200)
+        self.assertEqual(self.b.get(self.base+'?kind=message').json()['total'],0);self.assertEqual(self.a.get('/api/profiles/me').json()['rpg'],before)
+
+    def test_report_feed_is_bounded_and_captain_can_remove(self):
+        pin=self.create();path=self.path+'/pins/'+pin['id']+'/reports'
+        for index in range(23):self.b.post(path,json={'body':'人潮更新 '+str(index),'client_id':secrets.token_hex(16)})
+        data=self.a.get(path).json();self.assertEqual(data['total'],23);self.assertEqual(len(data['items']),20)
+        self.assertTrue(all(row['can_delete'] for row in data['items']))
+        self.assertEqual(self.a.delete(path+'/'+data['items'][0]['id']).status_code,200)
+        self.assertEqual(self.b.get(path).json()['total'],22)
+        with self.module.connect() as db:db.execute('UPDATE pins SET expires=? WHERE id=?',(self.module.now()-1,pin['id']))
+        self.assertEqual(self.b.get(path).status_code,404);self.assertEqual(self.b.post(path,json={'body':'過期回報','client_id':secrets.token_hex(16)}).status_code,404)
+
+    def test_interactions_follow_author_and_annotate_only_current_viewer(self):
+        pin=self.create(hours=0);second=self.create(hours=0);other=self.create(self.c,hours=0)
+        flags=lambda client:{row['id']:row for row in self.snapshot(client)['pins']}
+        self.assertFalse(flags(self.b)[pin['id']]['following_author'])
+        self.assertFalse(flags(self.b)[pin['id']]['reported_by_me'])
+        self.assertEqual(self.outsider.put(self.path+'/pins/'+pin['id']+'/vote',json={'value':1}).status_code,403)
+        self.b.put(self.path+'/pins/'+pin['id']+'/vote',json={'value':1})
+        self.assertTrue(flags(self.b)[second['id']]['following_author'])
+        self.assertFalse(flags(self.c)[second['id']]['following_author'])
+        self.b.put(self.path+'/pins/'+pin['id']+'/vote',json={'value':0})
+        self.assertEqual(flags(self.b)[pin['id']]['my_vote'],0)
+        self.assertTrue(flags(self.b)[second['id']]['following_author'])
+        self.b.put(self.path+'/pins/'+other['id']+'/vote',json={'value':-1})
+        self.assertFalse(flags(self.b)[other['id']]['following_author'])
+        report_path=self.path+'/pins/'+other['id']+'/reports'
+        report=self.b.post(report_path,json={'body':'目前空位很多','client_id':secrets.token_hex(16)}).json()
+        self.assertTrue(flags(self.b)[other['id']]['reported_by_me'])
+        self.assertTrue(flags(self.b)[other['id']]['following_author'])
+        new=self.create(self.c,hours=0)
+        self.assertTrue(flags(self.b)[new['id']]['following_author'])
+        self.b.delete(report_path+'/'+report['id'])
+        self.assertFalse(flags(self.b)[other['id']]['reported_by_me'])
+        self.assertTrue(flags(self.b)[other['id']]['following_author'])
+        self.assertEqual(self.outsider.get(self.path).status_code,403)
+        self.module.init_db();self.module.init_db()
+        with self.module.connect() as db:
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM landmark_follows WHERE follower=?',(self.users[1]['id'],)).fetchone()[0],2)

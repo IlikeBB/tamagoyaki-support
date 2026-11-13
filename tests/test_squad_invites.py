@@ -96,11 +96,12 @@ class SquadInvitesTest(test_app.RendezvousTest):
         self.assertEqual(self.a.post(self.invites+'/invites',json={'friend_id':self.users[3]['id'],'client_id':secrets.token_hex(16),'body':'replace invitation'}).status_code,422)
 
     def test_nonfriends_cannot_use_codes_and_failed_join_keeps_location(self):
-        point={'lat':25.033,'lng':121.5654,'accuracy':8,'scope':'expedition'}
+        personal=self.b.post(self.path+'/squads',json={'name':'原有小隊'}).json()
+        point={'lat':25.033,'lng':121.5654,'accuracy':8,'scope':'squad','squad_id':personal['id']}
         self.assertEqual(self.b.put(self.path+'/location',json=point).status_code,200)
         result=self.b.post(self.path+'/squads/join',json={'code':self.squad['code']})
         self.assertEqual(result.status_code,403);self.assertIn('互為好友',result.json()['detail'])
-        mine=self.snapshot(self.b)['me'];self.assertIsNone(mine['squad']);self.assertEqual(mine['scope'],'expedition');self.assertEqual(mine['lat'],point['lat'])
+        mine=self.snapshot(self.b)['me'];self.assertEqual(mine['squad'],personal['id']);self.assertEqual(mine['scope'],'squad');self.assertEqual(mine['lat'],point['lat'])
         self.befriend(1)
         self.assertEqual(self.b.post(self.path+'/squads/join',json={'code':self.squad['code']}).status_code,200)
 
