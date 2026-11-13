@@ -161,7 +161,7 @@ iPhone／iPad 主畫面模式（`navigator.standalone`）使用 `100vh` 作為�
 
 地圖左上角使用 Google Maps JavaScript Places Library 的 `Place.searchByText()`（Text Search New），可輸入地點名稱或地址，按「搜尋」後選取結果，再標記限時／永久地標或固定任務旗標。搜尋包含台灣與日本，不限制在一公里內；選取範圍外的結果會自動關閉一公里限制。使用 `google-maps.local.json` 的同一把受網站限制金鑰，需啟用 Places API (New)（`places.googleapis.com`），並將該服務加入金鑰允許的 API；原本的 Maps JavaScript API 與網站限制保留。搜尋在瀏覽器直接送往 Google，不經 Python 代理，不再呼叫 Photon，也不使用原本的 24 小時伺服器搜尋快取。只在送出時查詢，僅要求地點 ID、名稱、地址、座標四個欄位，最多 8 筆；不附上使用者 GPS。搜尋結果保留在目前頁面記憶體，清空或離開後不保留，並顯示 Google Maps 與供應者標示。Google 搜尋不可用時會顯示錯誤，可重試或長按地圖標記；舊版 `/api/places/search` 回傳 410 提示重新整理。參考 [Text Search (New)](https://developers.google.com/maps/documentation/javascript/place-search)。
 
-長按地圖約 0.6 秒（電腦也可按右鍵），可在選定位置插旗或選擇「標記地標」。旗標不隨發布者的 GPS 移動，座標仍只有接取者可見；地標可選 2、6、24 小時，或「永久標記」。永久標記以 `hours: 0` 發布，`expires` 為 `null`，不會自動到期；可以評價並計入 XP，但不因負評自動移除。建立者與目前遠征隊的建立者（管理員／隊長）可刪除地標，伺服器會檢查權限。方向卡顯示在地圖左下側，位於定位設定卡下方。
+情報點頁面提供「臨時情報點」與「定期情報點」建立按鈕。臨時情報點預設 2 小時，可選 2、6、24 小時，到期後隱藏；定期情報點依需求代表永久保留、手動刪除，以 `hours: 0` 發布，`expires` 為 `null`。表單可切換保留方式，列表與方向卡會顯示對應類型。兩者皆可評價並計入 XP；定期情報點不因負評自動移除。只有建立者與目前遠征隊的建立者（管理員／隊長）可刪除，伺服器會檢查權限。長按地圖約 0.6 秒（電腦也可按右鍵）可選取情報點座標，搜尋地點後也可標記；從情報點頁面建立時預設使用地圖中心，可改用目前 GPS。任務旗標仍固定在選定位置，只有接取者能取得座標。方向卡顯示在地圖左下側，位於定位設定卡下方。
 
 ```powershell
 conda run -n agent python -m unittest discover -s tests -t . -v

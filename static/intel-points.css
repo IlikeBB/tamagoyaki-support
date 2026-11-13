@@ -1,0 +1,3 @@
+.intel-create-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.intel-create-actions .button{min-height:44px;padding:10px 8px;gap:6px;white-space:normal}
+.intel-create-actions svg{width:18px;height:18px}

@@ -1,6 +1,15 @@
 {
   "announcements": [
     {
+      "id": "intel-point-types-20261114",
+      "type": "update",
+      "published_at": "2026-11-14",
+      "title": "新增臨時與定期情報點",
+      "body": [
+        "情報點頁面可直接建立臨時情報點或定期情報點。臨時情報點可保留 2、6、24 小時，到期自動隱藏；定期情報點永久保留，由本人或隊長手動刪除。"
+      ]
+    },
+    {
       "id": "squad-location-sharing-20261113",
       "type": "update",
       "published_at": "2026-11-13",

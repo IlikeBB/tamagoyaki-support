@@ -46,8 +46,8 @@ try{
   pointOffset=1;
   await page.locator('[data-mobile=map]').click();
   const pinPoint=await hold();await page.locator('[data-map-create=pin]').click();
-  await expect(page.locator('#dialog-body h2')).toHaveText('標記地標。');
-  await expect(page.locator('#hours')).toHaveValue('2');await expect(page.locator('#hours option[value="0"]')).toHaveText('永久標記');
+  await expect(page.locator('#dialog-body h2')).toHaveText('建立臨時情報點。');
+  await expect(page.locator('#hours')).toHaveValue('2');await expect(page.locator('#hours option[value="0"]')).toHaveText('定期情報點（永久保留）');
   await page.locator('#title').fill('臨時地標 '+suffix);await page.locator('#publish-form [type=submit]').click();await expect(page.locator('#dialog')).not.toBeVisible();
   data=await (await b.context.request.get(origin+path)).json();const pin=data.pins.find(p=>p.title==='臨時地標 '+suffix);expect(pin.lat).toBeCloseTo(pinPoint.lat,6);expect(pin.expires-pin.created).toBe(7200);
   await expect(page.locator(`[data-action=delete-pin][data-id="${pin.id}"]`)).toBeVisible();
@@ -57,6 +57,15 @@ try{
   await expect.poll(async()=>(await (await b.context.request.get(origin+path)).json()).pins.length).toBe(0);
   await page.evaluate(()=>refresh());
   checks.push('temporary landmark defaults to two hours; creator and captain get deletion controls; another member receives 403; captain deletes successfully');
+  await page.locator('[data-tab=pins]').last().click();
+  await page.locator('[data-action=publish-intel][data-lifetime=temporary]').click();await expect(page.locator('#hours')).toHaveValue('2');await expect(page.locator('#dialog-body h2')).toHaveText('建立臨時情報點。');await page.locator('#dialog [data-action=close]').click();
+  await page.locator('[data-action=publish-intel][data-lifetime=permanent]').click();await expect(page.locator('#hours')).toHaveValue('0');await expect(page.locator('#dialog-body h2')).toHaveText('建立定期情報點。');
+  await page.locator('#hours').selectOption('24');await expect(page.locator('#dialog-body h2')).toHaveText('建立臨時情報點。');await page.locator('#hours').selectOption('0');
+  await page.locator('#title').fill('定期情報點 '+suffix);await page.locator('#publish-form [type=submit]').click();await expect(page.locator('#dialog')).not.toBeVisible();
+  data=await (await b.context.request.get(origin+path)).json();const permanent=data.pins.find(p=>p.title==='定期情報點 '+suffix);expect(permanent.expires).toBeNull();await expect(page.locator('.pin-row')).toContainText('定期情報點');
+  await page.evaluate(()=>refresh());expect((await (await b.context.request.get(origin+path)).json()).pins.find(p=>p.id===permanent.id).expires).toBeNull();
+  expect((await c.context.request.delete(origin+path+'/pins/'+permanent.id)).status()).toBe(403);await page.locator(`[data-action=delete-pin][data-id="${permanent.id}"]`).click();await expect.poll(async()=>(await (await b.context.request.get(origin+path)).json()).pins.length).toBe(0);
+  checks.push('information page has temporary and permanent presets; permanent points survive refresh without expiry and only authorized users can delete them');
   await page.locator('[data-mobile=map]').click();await hold(false);await page.keyboard.press('Escape');await expect(page.locator('#map-actions')).toBeHidden();await expect(page.locator('[data-action=pin-center]')).toBeFocused();
   await page.keyboard.press('Enter');await expect(page.locator('#map-actions')).toBeVisible();await expect(page.locator('[data-map-create=task]')).toBeFocused();await page.keyboard.press('Escape');
   checks.push('mouse long press, Escape focus restoration and keyboard map-centre menu work');
