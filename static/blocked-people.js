@@ -1,9 +1,0 @@
-'use strict';
-class BlockedPeople {
-  constructor(actions){this.actions=actions;this.generation=0;this.request=0;}
-  sync(){if(this.uid&&this.uid!==this.actions.user()?.id){this.generation++;if(this.root?.isConnected){this.root.replaceChildren();document.querySelector('#dialog').close();}this.uid=null;this.root=null;}}
-  current(generation=this.generation){return generation===this.generation&&this.uid===this.actions.user()?.id&&this.root?.isConnected&&document.querySelector('#dialog').open;}
-  open(){if(!this.actions.user())return;this.uid=this.actions.user().id;this.generation++;this.actions.dialog({kind:'blockedFrame'});this.root=document.querySelector('#blocked-people');this.root.onclick=event=>{const button=event.target.closest('button');if(!button)return;if(button.hasAttribute('data-block-retry'))this.load();if(button.dataset.unblock)this.remove(button);};this.load();}
-  async load(){const generation=this.generation,request=++this.request;try{const data=await this.actions.api('/blocks');if(!this.current(generation)||request!==this.request)return;TamagoVue.renderList(this.root.querySelector('[data-block-list]'),'blocked',{items:data.items});this.root.querySelector('[data-block-status]').textContent='';}catch(error){if(this.current(generation))this.root.querySelector('[data-block-status]').textContent=error.message;}}
-  async remove(button){const generation=this.generation;button.disabled=true;try{await this.actions.api('/blocks/'+button.dataset.unblock,'DELETE');if(!this.current(generation))return;await this.load();await this.actions.changed(this.uid);if(!this.current(generation))return;this.actions.toast('已解除封鎖，可重新申請好友。');}catch(error){if(this.current(generation))this.root.querySelector('[data-block-status]').textContent=error.message;}finally{if(button.isConnected)button.disabled=false;}}
-}

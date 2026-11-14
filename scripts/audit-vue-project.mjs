@@ -32,11 +32,15 @@ function visit(file) {
 visit('frontend/main.js');
 const components = walk('frontend/components').filter(file => file.endsWith('.vue'));
 assert.deepEqual(components.filter(file => !reached.has(file)), [], 'Every shipped Vue component must be reachable from the entry');
-for (const file of source.filter(file => file.startsWith('static/') && file.endsWith('.js'))) {
+for (const file of source.filter(file => (file.startsWith('static/') || file.startsWith('frontend/')) && file.endsWith('.js'))) {
   assert(!/\b(?:innerHTML|outerHTML|insertAdjacentHTML|createContextualFragment)\b/.test(text(file)), 'HTML rendering belongs in Vue: ' + file);
   assert(!/<(?:div|section|form|button|article|header|aside|nav|ul|li|svg|span|p|h[1-6])(?:\s|>)/i.test(text(file)), 'Retired string-based UI renderer remains: ' + file);
 }
 const html = text('static/index.html');
 assert.equal((html.match(/src="\/static\/vue\/app\.js\?v=/g) || []).length, 1);
+const scripts = [...html.matchAll(/src="(\/static\/[^"?]+)(?:\?[^" ]*)?"/g)].map(match=>match[1]);
+assert.deepEqual(scripts.sort(), ['/static/vendor/leaflet.js','/static/vue/app.js'], 'Only the SDK and the single Vue application entry may load');
+assert.deepEqual(walk('static').filter(file=>/^static\/[^/]+\.js$/.test(file)), ['static/sw.js'], 'Independent business scripts must live in imported application modules');
+assert.equal((text('frontend/main.js').match(/createApp\(/g)||[]).length,1);
 assert(/<body>\s*<noscript>[\s\S]*?<\/noscript>\s*<\/body>/.test(html), 'The document must delegate the interface shell to Vue');
-console.log(JSON.stringify({ ok: true, vueComponents: components.length, referencedAssets: references.size, unreferencedStaticFiles: 0, legacyHtmlRenderers: 0 }));
+console.log(JSON.stringify({ ok: true, vueComponents: components.length, referencedAssets: references.size, independentBusinessScripts:0, unreferencedStaticFiles: 0, legacyHtmlRenderers: 0 }));

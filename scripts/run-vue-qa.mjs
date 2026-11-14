@@ -9,7 +9,7 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const core = ['profiles-test', 'profile-content-test', 'wall-history-test', 'landmark-delete-test', 'landmark-reports-test',
   'squad-roster-test', 'squad-friend-invites-test', 'squad-chat-test', 'friends-ui-test', 'friends-vue-test',
   'chat-test', 'chat-vue-test', 'chat-friend-news-test', 'expedition-members-test', 'event-range-test',
-  'expeditions-vue-test', 'expedition-leave-test', 'expeditions-page-test', 'expedition-admin-test', 'expedition-permissions-test',
+  'expeditions-vue-test', 'vue-lifecycle-test', 'expedition-leave-test', 'expeditions-page-test', 'expedition-admin-test', 'expedition-permissions-test',
   'news-ui-test', 'place-search-test', 'map-actions-test', 'map-presence-test', 'finder-ui-test',
   'location-audience-test', 'assistance-test', 'background-location-test', 'theme-test', 'ios-viewport-test',
   'interface-zoom-test', 'app-display-test', 'app-viewport-test', 'venue-map-test', 'landmark-zoom-test', 'google-places-test', 'site-admin-test'];

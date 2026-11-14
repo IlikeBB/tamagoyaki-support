@@ -1,10 +1,13 @@
-import { createApp, reactive, nextTick } from 'vue';
+import { Surface } from './surface.js';
+import { VueService } from './runtime/resources.js';
+import { reactive, nextTick } from 'vue';
 import FriendsPanel from './components/FriendsPanel.vue';
 
 // Vue owns the shared panel only while the friends tab is selected.
 // Location permissions and API synchronization remain in FriendsClient.
-export class FriendsView {
+export class FriendsView extends VueService {
   constructor(actions) {
+    super(); const resources = this.resources; resources.defer(()=>this.unmount());
     this.actions = actions;
     this.revision = 0;
     this.state = reactive({
@@ -32,12 +35,12 @@ export class FriendsView {
     if (this.root === root) return;
     this.unmount();
     this.root = root;
-    this.app = createApp(FriendsPanel, { controller: this });
-    this.app.mount(root);
+    this.app = new Surface(root, FriendsPanel);
+    this.app.update({ controller: this }); root.setAttribute("data-v-app", "");
   }
 
   unmount() {
-    this.app?.unmount();
+    this.app?.clear();
     this.app = null;
     this.root = null;
   }

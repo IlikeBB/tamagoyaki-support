@@ -1,13 +1,13 @@
 # 玉子燒支援隊 · Tamagoyaki Support
 
-手機優先的遠征會合網頁。Python FastAPI、SQLite，介面使用 Vue 3；底圖支援 Google Maps 與自架 Leaflet 1.9.4。正式網址：https://tamagoyaki-support.modoubletw.com/
+手機優先的遠征會合網頁。Python FastAPI、SQLite，前端由 Vue 3 管理；底圖支援 Google Maps 與自架 Leaflet 1.9.4。正式網址：https://tamagoyaki-support.modoubletw.com/
 
 ## 專案結構
 
 - `backend/`：Python 後端、資料存取與啟動入口。
 - `tests/`：Python 單元與整合測試。
 - `static/`：網頁介面、樣式、圖示及地圖資源。
-- `frontend/`：Vue 單檔元件、介面銜接層與 Vite 建置設定。
+- `frontend/`：Vue 元件、composables、共用狀態、功能命令、服務模組與 Vite 建置設定。
 - `scripts/`：部署腳本與瀏覽器驗證工具。
 - `assets/`：地圖原始素材。
 
@@ -184,7 +184,7 @@ iPhone／iPad 主畫面模式（`navigator.standalone`）使用 `100vh` 作為�
 
 ### Vue 前端建置
 
-`vue-version` 分支的介面由 Vue 元件繪製，沿用原有 API、驗證及導覽。共用入口為 `frontend/main.js`，元件放在 `frontend/components/`。`AppShell.vue` 包含導覽、地圖控制與對話框的版面；`static/index.html` 保留文件設定與載入入口，Vue 在其餘 deferred 控制器啟動前建立版面。
+`vue-version` 的前端由單一 `frontend/main.js` 入口建立 Vue 應用。`AppShell.vue` 透過 `useApplication()` 管理狀態、操作路由與服務生命週期；`stores/` 管理 session、介面與主題，`features/` 放置功能命令，`services/` 是明確匯入的 API／瀏覽器服務模組。HTML 只載入 Leaflet SDK 與建置後的 Vue 入口，不再載入獨立業務腳本。Python API 與資料庫格式保留。
 
 | 介面 | 元件／銜接層 |
 | --- | --- |
@@ -195,9 +195,9 @@ iPhone／iPad 主畫面模式（`navigator.standalone`）使用 `100vh` 作為�
 | News、好友邀請、地標留言與小隊邀請 | `NewsList.vue`、`ContentList.vue` |
 | 地圖搜尋、追蹤方向卡、尋人浮窗、雷達與地圖標記 | `PlaceResults.vue`、`TargetCard.vue`、`FinderBody.vue`、`RadarChips.vue`、`MapMarker.vue` |
 
-`frontend/*-view.js` 是 Vue 與既有服務的邊界；`surface.js` 在控制器需要立即取得表單／canvas 時使用 Vue 的同步 render API，不使用執行時模板編譯或 `v-html`。Google Maps／Leaflet 接收 Vue 繪製的 DOM 標記，移除標記時卸載元件。圖片裁切仍由 canvas 處理。導覽、GPS、地圖 SDK、API 請求、權限、同步、重試去重與資料有效期限由原 JavaScript 控制器負責，Python 後端不變。聊天等待 Vue 完成繪製後再計算捲動及已讀。
+`useApplication()` 的 Vue effect scope 擁有所有服務。`runtime/resources.js` 管理監聽器、事件屬性、計時器、動畫回呼、HTTP 請求與 GPS watch，卸載時取消；不可取消的舊定位回呼會被忽略。Google Maps／Leaflet、canvas、焦點和幾何量測仍使用瀏覽器 SDK，由此 scope 啟動與清理。`surface.js` 共用根應用的 appContext，使用 Vue 同步 render API 繪製需要立即取得 DOM 的區域，並在根應用卸載時一併卸載；不另建 Vue app，也不使用執行時模板或 `v-html`。聊天在 Vue 繪製後計算捲動與已讀。
 
-好友介面包含搜尋結果、收到／送出邀請、好友列表、頭貼、聊天入口及位置分享開關。`static/friends.js` 保留好友 API、位置同步與有效期限判斷；Vue 管理表單草稿、錯誤與操作狀態。同步時以成員 ID 保留列與焦點，切換頁籤會卸載 Vue，返回時保留未送出的邀請帳號；登出或切換帳號則清除私人資料與草稿，忽略舊請求回應。好友預覽沿用右上角入口，News 與聊天頭像的好友邀請仍使用既有流程。
+好友介面包含搜尋結果、收到／送出邀請、好友列表、頭貼、聊天入口及位置分享開關。`frontend/services/friends.js` 在 Vue scope 內處理好友 API、位置同步與有效期限；Vue 管理表單草稿、錯誤與操作狀態。同步時以成員 ID 保留列與焦點，切換頁籤會卸載 Vue，返回時保留未送出的邀請帳號；登出或切換帳號則清除私人資料與草稿，忽略舊請求回應。好友預覽沿用右上角入口，News 與聊天頭像的好友邀請仍使用既有流程。
 
 修改 Vue 原始碼後執行：
 
@@ -237,11 +237,11 @@ node scripts/squad-friend-invites-test.mjs
 
 正式服務已於 2026-11-14 切換至 `F:\work_project\tamagoyaki_support_vue`，使用 `vue-version` 分支與原 HTTPS 網址。這個目錄的 `data/tamagoyaki.sqlite3` 現為正式資料庫：切換時先停止原服務，再用 SQLite backup API 取得最新資料，確認資料完整性與有效登入紀錄後啟動。Google Maps／Cloudflare 本機設定保留且不提交。執行 QA 工具仍會另外建立測試資料庫，不會使用正式資料。
 
-原 `F:\work_project\tamagoyaki_support` 的 `main` checkout 已停止服務；其資料是切換前的版本，後續不會同步。日常啟動／停止請使用 Vue 目錄內的 `scripts/start-public.ps1`／`scripts/stop-public.ps1`，避免誤啟舊版。若需回復版本，必須先停止 Vue 服務並保留最新正式資料，再切換程式，不能直接用舊資料庫覆蓋。
+原 `F:\work_project\tamagoyaki_support` 的 `main` checkout 已停止服務；其資料是切換前的版本，後續不會同步。從 Codex 或其他會清理子程序的終端啟動正式站，使用 Vue 目錄內的 `scripts/start-public-detached.ps1`；它以隱藏的獨立 Windows 程序呼叫既有啟動腳本，結果寫入 `.run-logs/launcher.log`。手動終端仍可使用 `scripts/start-public.ps1`，停止使用 `scripts/stop-public.ps1`。若需回復版本，必須先停止 Vue 服務並保留最新正式資料，再切換程式，不能直接用舊資料庫覆蓋。
 
-舊 RPG 介面繪製檔及未使用的第一版幕張覆蓋圖已移除；實際使用的 v2 場館素材與原始製圖素材保留。一次性遷移腳本、舊 QA 資料與切換備份移至專案外的 `F:\work_project\artifacts\tamagoyaki-support-archive`，本機 `.run-logs/vue-deployment.json` 記錄這次備份路徑。`static/` 的 JavaScript 負責 API、GPS、地圖 SDK 與生命週期，所有介面結構由 `frontend/` 的 Vue 元件繪製，不含另一份可啟動的舊介面。
+舊 RPG 介面繪製檔及未使用的第一版幕張覆蓋圖已移除；實際使用的 v2 場館素材與原始製圖素材保留。一次性遷移腳本、舊 QA 資料與切換備份移至專案外的 `F:\work_project\artifacts\tamagoyaki-support-archive`，本機 `.run-logs/vue-deployment.json` 記錄這次備份路徑。舊的 36 支獨立業務腳本已移除；前端原始碼與服務皆由 Vue 應用匯入，`static/` 僅保留建置產物、樣式、素材、SDK 與 service worker。
 
-可執行 `node scripts/audit-vue-project.mjs` 核對 Vue 元件引用、靜態資源與舊 HTML 繪製程式殘留。正式網址只執行 `node scripts/production-smoke.mjs` 的唯讀檢查，使用新的訪客瀏覽器並阻擋所有寫入；涵蓋實際 Vue bundle、Google Maps、五個場館標記、縮放、遠征隊瀏覽、設定及註冊表單、明暗模式與 320–1440 像素版面。
+可執行 `node scripts/audit-vue-project.mjs` 核對 Vue 元件引用、唯一應用入口、靜態資源與舊 HTML 繪製程式殘留。`node scripts/run-vue-qa.mjs vue-lifecycle-test` 驗證卸載時清除資源、取消請求、攔截舊 GPS 回呼，及重新掛載時建立新狀態。只有隔離的 loopback 8079 會安裝測試橋接，正式網址與 8078 不公開業務狀態。正式網址只執行 `node scripts/production-smoke.mjs` 的唯讀檢查，使用新的訪客瀏覽器並阻擋所有寫入；涵蓋實際 Vue bundle、Google Maps、五個場館標記、縮放、遠征隊瀏覽、設定及註冊表單、明暗模式與 320–1440 像素版面。
 
 ### 功能驗證
 

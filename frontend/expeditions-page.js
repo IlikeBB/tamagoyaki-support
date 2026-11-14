@@ -1,10 +1,12 @@
-import { createApp, reactive, shallowRef, nextTick } from 'vue';
+import { Surface } from './surface.js';
+import { VueService } from './runtime/resources.js';
+import { reactive, shallowRef, nextTick } from 'vue';
 import ExpeditionsView from './components/ExpeditionsPage.vue';
 
-// This bridge is the only boundary between Vue and the existing application.
-// The API, authentication and map navigation keep their current owners.
-export class ExpeditionsPage {
+// Vue expedition feature; application commands are injected by useApplication.
+export class ExpeditionsPage extends VueService {
   constructor(root, actions) {
+    super(); const resources = this.resources; resources.defer(()=>this.app?.clear());
     this.root = root;
     this.actions = actions;
     this.state = reactive({
@@ -13,8 +15,8 @@ export class ExpeditionsPage {
       loadingMine: false, loadingCatalog: false, mineError: '', catalogError: '', busy: null,
     });
     this.context = shallowRef(actions.context());
-    this.app = createApp(ExpeditionsView, { controller: this });
-    this.app.mount(root);
+    this.app = new Surface(root, ExpeditionsView);
+    this.app.update({ controller: this }); root.setAttribute("data-v-app", "");
   }
 
   get mode() { return this.state.mode; }
@@ -120,6 +122,6 @@ export class ExpeditionsPage {
 
   destroy() {
     this.state.generation++; this.state.catalogGeneration++;
-    this.app.unmount();
+    this.app.clear();
   }
 }

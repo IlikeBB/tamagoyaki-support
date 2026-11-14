@@ -1,26 +1,29 @@
-import { createApp, reactive, nextTick } from 'vue';
+import { Surface } from './surface.js';
+import { VueService } from './runtime/resources.js';
+import { reactive, nextTick } from 'vue';
 import ChatDialog from './components/ChatDialog.vue';
 
-export class ChatView {
+export class ChatView extends VueService {
   constructor(root, actions) {
+    super(); const resources = this.resources; resources.defer(()=>this.app?.clear());
     this.root = root; this.actions = actions; this.revision = 0;
     this.state = reactive({
       filter: 'all', contacts: [], active: null, messages: [], uid: null, draft: '',
       busy: false, online: navigator.onLine, status: '每 5 秒同步', retry: false,
       error: '', empty: '', hasOlder: false, newMessages: false,
     });
-    this.app = createApp(ChatDialog, { controller: this });
-    this.app.mount(root);
-    root.addEventListener('close', () => {
+    this.app = new Surface(root, ChatDialog);
+    this.app.update({ controller: this }); root.setAttribute("data-v-app", "");
+    resources.listen(root, 'close', () => {
       this.fit(); actions.closed();
       document.querySelector('#chat-launcher').focus({ preventScroll: true });
     });
     const fit = () => this.fit();
-    window.visualViewport?.addEventListener('resize', fit);
-    window.visualViewport?.addEventListener('scroll', fit);
-    window.addEventListener('resize', fit);
-    root.addEventListener('focusin', fit);
-    root.addEventListener('focusout', () => requestAnimationFrame(fit));
+    resources.listen(window.visualViewport, 'resize', fit);
+    resources.listen(window.visualViewport, 'scroll', fit);
+    resources.listen(window, 'resize', fit);
+    resources.listen(root, 'focusin', fit);
+    resources.listen(root, 'focusout', () => resources.frame(fit));
   }
 
   get filter() { return this.state.filter; }
@@ -33,9 +36,7 @@ export class ChatView {
 
   // The launcher belongs to the outer application; Vue owns the dialog only.
   badge(count) {
-    const badge = document.querySelector('#chat-unread');
-    badge.hidden = !count; badge.textContent = count > 99 ? '99+' : String(count);
-    document.querySelector('#chat-launcher').setAttribute('aria-label', count ? `訊息，${count} 則未讀` : '訊息');
+    this.actions.badge(count);
   }
 
   status(message, error = false) { this.state.status = message; this.state.retry = error; }
@@ -83,6 +84,7 @@ export class ChatView {
   inputChanged(value) { this.actions.draft(value); this.resizeInput(); }
   clearDraft(value) { if (this.input.value === value) this.state.draft = ''; }
   resizeInput() {
+    if (!this.resources.active || !this.input) return;
     this.input.style.height = '0px';
     this.input.style.height = Math.min(112, Math.max(48, this.input.scrollHeight)) + 'px';
   }
@@ -90,6 +92,7 @@ export class ChatView {
   latest() { this.scroll.scrollTop = this.scroll.scrollHeight; this.state.newMessages = false; this.actions.read(); }
 
   fit() {
+    if (!this.resources.active) return;
     const viewport = window.visualViewport, focused = this.root.contains(document.activeElement) && document.activeElement.matches('textarea,input');
     const full = document.body.getBoundingClientRect().height;
     const keyboard = this.root.open && focused && viewport && Math.abs(viewport.scale - 1) < .01 && viewport.height < full - 150;

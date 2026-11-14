@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
 
-const source=await readFile(new URL('../static/google-places.js',import.meta.url),'utf8');
+const source=(await readFile(new URL('../frontend/services/google-places.js',import.meta.url),'utf8')).replace('export function createGooglePlaces','function createGooglePlaces');
 function client(importLibrary){
  const google={maps:{importLibrary}},window={google};
- vm.runInNewContext(source,{window,google,setTimeout,clearTimeout});return window.TamagoGooglePlaces;
+ vm.runInNewContext(source+';window.client=createGooglePlaces(resources);',{window,google,resources:{active:true,timeout:setTimeout,clearTimeout,defer:()=>()=>{}},DOMException});return window.client;
 }
 const point=(id='taipei-101',lat=25.034,lng=121.5645)=>({id,displayName:'台北101',formattedAddress:'台北市信義區',location:{lat:()=>lat,lng:()=>lng},attributions:[{provider:'資料供應者',providerURI:'https://example.com/'}]});
 const calls=[];let imports=0;

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
-const source=await readFile(new URL('../static/squad-invites.js',import.meta.url),'utf8'),context={URL,location:{origin:'https://example.test'}};
+const source=(await readFile(new URL('../frontend/services/squad-invites.js',import.meta.url),'utf8')).replace(/^import[^\n]+\n/gm,'').replace('export class','class'),context={URL,VueService:class {},location:{origin:'https://example.test'}};
 vm.runInNewContext(source+';globalThis.Invites=SquadInvites;',context);
 const valid='https://example.test/?join=ROOM1234&squad=TEAM5678';
 const credentialed=new URL(valid);credentialed.username='user';credentialed.password='password';
