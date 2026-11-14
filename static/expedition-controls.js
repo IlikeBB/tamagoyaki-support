@@ -11,6 +11,6 @@ async function leaveExpeditionFromMenu(id,uid){
   const current=!state.demo&&state.room.id===id;if(current)await stopTeamLocation();
   const result=await api(`/expeditions/${encodeURIComponent(id)}/membership`,'DELETE');if(!state.authenticated||state.user.id!==uid)return;
   assistance?.sync(result.help_rooms||[]);if(current){resetLobby();try{localStorage.removeItem('tamago-room');}catch{}}
-  state.rooms=state.rooms.filter(room=>room.id!==id);if(roomSettings?.room.id===id&&roomSettings.current())closeDialog();await syncRoomChanges(uid,{catalog:true});toast('已退出遠征隊。');
+  state.rooms=state.rooms.filter(room=>room.id!==id);if(roomSettings?.room?.id===id&&roomSettings.current())closeDialog();await syncRoomChanges(uid,{catalog:true});toast('已退出遠征隊。');
 }
 function activitySchedule(room){const range=room.event_end_date&&room.event_end_date!==room.event_date;return activityDate(room.event_date,room.event_end_date)+(room.event_time?(range?' · 開始 ':' ')+room.event_time+'（'+(room.time_zone==='Asia/Taipei'?'台灣':'日本')+'）':'');}

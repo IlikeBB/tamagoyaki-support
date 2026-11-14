@@ -15,7 +15,6 @@ window.TamagoTheme=(()=>{
   document.addEventListener('change',event=>{if(event.target.matches('[data-theme-toggle]'))set(event.target.checked);});
   system.addEventListener('change',()=>{if(!choice)apply();});
   window.addEventListener('storage',event=>{if(event.key!==key)return;choice=['dark','light'].includes(event.newValue)?event.newValue:null;apply();});
-  const control=()=>`<label class="theme-setting"><span><strong>黑夜模式</strong><small>套用至介面與地圖，記住此裝置的選擇</small></span><input type="checkbox" role="switch" aria-label="黑夜模式" data-theme-toggle ${dark()?'checked':''}><span class="theme-switch" aria-hidden="true"></span></label>`;
   function googleStyles(){
     const poi={featureType:'poi',elementType:'labels',stylers:[{visibility:'off'}]};
     if(!dark())return [poi];
@@ -33,5 +32,5 @@ window.TamagoTheme=(()=>{
       {featureType:'water',elementType:'labels.text.fill',stylers:[{color:'#8ab7c4'}]},poi
     ];
   }
-  apply();return {dark,set,control,googleStyles};
+  apply();return {dark,set,googleStyles};
 })();

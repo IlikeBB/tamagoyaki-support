@@ -235,7 +235,13 @@ node scripts/squad-friend-invites-test.mjs
 
 涵蓋建立／加入、成員預覽、日期區間、失敗重試、場館請求競態、帳號切換、搜尋與鍵盤焦點、CSP，以及手機／桌機與黑夜模式。聊天另驗證私訊／遠征隊／小隊權限、傳送重試去重、草稿與頭貼、歷史捲動位置、已讀、輸入法組字、禁言、離線與好友／小隊邀請。會註冊帳號或變更成員的測試僅可對隔離 QA 環境執行。
 
-Vue 開發工作目錄為 `F:\work_project\tamagoyaki_support_vue`，使用 `vue-version` 分支，與原本正式環境的 `main` checkout 分開。該目錄保留未提交的 Google Maps／Cloudflare 本機設定，以及透過 SQLite backup API 取得的正式資料副本；不會搬走或更動原服務的資料。副本不是持續同步的資料庫。執行 QA 工具會另外建立測試資料庫，不使用這份副本。正式服務尚未切換至 Vue 目錄，部署前應重新取得最新資料，不能用舊副本覆蓋持續運作中的資料庫。
+正式服務已於 2026-11-14 切換至 `F:\work_project\tamagoyaki_support_vue`，使用 `vue-version` 分支與原 HTTPS 網址。這個目錄的 `data/tamagoyaki.sqlite3` 現為正式資料庫：切換時先停止原服務，再用 SQLite backup API 取得最新資料，確認資料完整性與有效登入紀錄後啟動。Google Maps／Cloudflare 本機設定保留且不提交。執行 QA 工具仍會另外建立測試資料庫，不會使用正式資料。
+
+原 `F:\work_project\tamagoyaki_support` 的 `main` checkout 已停止服務；其資料是切換前的版本，後續不會同步。日常啟動／停止請使用 Vue 目錄內的 `scripts/start-public.ps1`／`scripts/stop-public.ps1`，避免誤啟舊版。若需回復版本，必須先停止 Vue 服務並保留最新正式資料，再切換程式，不能直接用舊資料庫覆蓋。
+
+舊 RPG 介面繪製檔及未使用的第一版幕張覆蓋圖已移除；實際使用的 v2 場館素材與原始製圖素材保留。一次性遷移腳本、舊 QA 資料與切換備份移至專案外的 `F:\work_project\artifacts\tamagoyaki-support-archive`，本機 `.run-logs/vue-deployment.json` 記錄這次備份路徑。`static/` 的 JavaScript 負責 API、GPS、地圖 SDK 與生命週期，所有介面結構由 `frontend/` 的 Vue 元件繪製，不含另一份可啟動的舊介面。
+
+可執行 `node scripts/audit-vue-project.mjs` 核對 Vue 元件引用、靜態資源與舊 HTML 繪製程式殘留。正式網址只執行 `node scripts/production-smoke.mjs` 的唯讀檢查，使用新的訪客瀏覽器並阻擋所有寫入；涵蓋實際 Vue bundle、Google Maps、五個場館標記、縮放、遠征隊瀏覽、設定及註冊表單、明暗模式與 320–1440 像素版面。
 
 ### 功能驗證
 
@@ -280,7 +286,7 @@ node scripts/country-venues-test.mjs
 node scripts/optional-date-test.mjs
 ```
 
-後端測試自動使用臨時 SQLite。瀏覽器測試以本機 Edge 無頭模式執行，測試註冊、組隊、GPS、任務、地標與重新載入，並用第三個獨立瀏覽器驗證帳號資料取回、改密碼撤銷其他登入、修改暱稱與登出。桌面與手機畫面輸出到 `artifacts/`。`QA_CHROMIUM` 可覆寫測試瀏覽器路徑，`QA_ORIGIN` 可覆寫隔離 QA 來源。Node 依賴僅用於測試，應用程式本身不需要 Node 服務。
+後端測試自動使用臨時 SQLite。瀏覽器測試以本機 Edge 無頭模式執行，測試註冊、組隊、GPS、任務、地標與重新載入，並用第三個獨立瀏覽器驗證帳號資料取回、改密碼撤銷其他登入、修改暱稱與登出。桌面與手機畫面輸出到 `artifacts/`。`QA_CHROMIUM` 可覆寫測試瀏覽器路徑，`QA_ORIGIN` 可覆寫隔離 QA 來源。Node 用於 Vue 建置與瀏覽器測試；正式服務由 Python 提供已建置的靜態檔，不需要額外的 Node 服務。
 
 ## 公開來源
 

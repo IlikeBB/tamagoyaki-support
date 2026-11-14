@@ -17,4 +17,11 @@ defineProps({ model: Object });
   <template v-else-if="model.kind === 'squad'"><h2>{{ model.create ? '小隊集合！' : '加入同行小隊。' }}</h2><p>小隊僅限好友加入，需與其中一位目前成員互為好友。每人在同一遠征隊中同時加入一個小隊。建立或加入新小隊會切換分組，好友與目前小隊模式會跟隨新分組；其他原有的小隊／任務分享會關閉，求助定位不受影響。</p><form id="squad-form"><label for="squad-value">{{ model.create ? '小隊名稱' : '小隊邀請碼' }}</label><input id="squad-value" name="value" required :maxlength="model.create ? 30 : 8" :minlength="model.create ? undefined : 8" :pattern="model.create ? undefined : '[A-Za-z0-9]{8}'" :placeholder="model.create ? '例如：玉子燒小隊' : '8 位小隊邀請碼'"><div class="form-error" role="alert"></div><button class="button primary full" type="submit">{{ model.create ? '建立小隊' : '加入小隊' }}</button></form></template>
   <template v-else-if="model.kind === 'invite'"><h2>{{ model.squad ? '你的小隊，等你集合。' : '把邀請碼交給夥伴。' }}</h2><p>{{ model.room.name }} · {{ model.squad ? '小隊邀請碼' : '遠征隊邀請碼' }}</p><div class="invite-code">{{ model.room.code }}</div><div class="invite-url">{{ model.url }}</div><p class="field-note">{{ model.squad ? '小隊僅限好友加入；即使取得連結，非好友也無法加入小隊。' : '邀請連結持有人可加入遠征隊並查看隊內任務。請只分享給同行夥伴。' }}</p><button class="button primary full" data-action="copy" :data-copy="model.url">複製邀請連結 <AppIcon name="link" /></button><section v-if="model.squad" id="squad-invite-friends"></section></template>
   <template v-else-if="model.kind === 'deleteRoom'"><h2>刪除這支遠征隊？</h2><p><strong>{{ model.room.name }}</strong></p><p>隊內任務、地標、群聊與位置分享會一併清除，所有成員將離開隊伍，原邀請碼無法再加入。個人檔案的場次與地標評價紀錄仍會保留。</p><p>刪除後無法復原。</p><button class="button primary full" data-action="confirm-delete-room" :data-id="model.id">確認刪除遠征隊</button><button class="button outline full" data-action="close">取消，保留隊伍</button></template>
+  <template v-else-if="model.kind === 'leaveRoom'">
+    <h2>結束這一段遠征？</h2>
+    <p><strong>{{ model.room.name }}</strong></p>
+    <p>退出會撤回你未完成的任務，並放棄已接取的任務。已開啟的好友分享會繼續。持有邀請碼仍可重新加入。</p>
+    <button type="button" class="button primary full" data-action="confirm-leave" :data-id="model.room.id" :data-user="model.userId">確認退出遠征隊</button>
+    <button type="button" class="button outline full" data-action="close">留下來</button>
+  </template>
 </template>

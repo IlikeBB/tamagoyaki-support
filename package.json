@@ -1,7 +1,7 @@
 {
   "name": "tamagoyaki-support",
   "private": true,
-  "description": "Python application with an incrementally adopted Vue frontend.",
+  "description": "Python API with a Vue 3 frontend.",
   "scripts": {
     "test:ui": "node scripts/browser-test.mjs",
     "build": "node scripts/build-frontend.mjs"

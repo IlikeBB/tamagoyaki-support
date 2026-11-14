@@ -2,7 +2,6 @@
 const $ = (s, root=document) => root.querySelector(s);
 const $$ = (s, root=document) => [...root.querySelectorAll(s)];
 function icons(root=document){$$('[data-icon]',root).forEach(el=>{TamagoVue.renderControl(el,{kind:'icon',name:el.dataset.icon});el.removeAttribute('data-icon');});}
-const esc = value => String(value??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const types={trade:'交換',bounty:'懸賞',giveaway:'配布',help:'求助',dining:'聚餐'};
 const pinTypes={booth:'特典／配布',toilet:'洗手間',shop:'商店',meet:'集合點',other:'其他地標',message:'地面留言'};
 const state={demo:true,authenticated:false,user:{id:'me',nickname:'你'},room:null,rooms:[],members:[],tasks:[],pins:[],squads:[],mine:{squad:null,scope:'off'},activeVenue:'makuhari',tab:'tasks',filter:'all',query:'',position:null,heading:null,scope:'off',watch:null,radar:true,target:null,online:true,pending:false};
@@ -132,7 +131,6 @@ function bearing(a,b){const r=Math.PI/180,x=Math.sin((b.lng-a.lng)*r)*Math.cos(b
 function meters(d){return d==null?'未定位':d<1000?`${Math.round(d)} m`:`${(d/1000).toFixed(1)} km`;}
 function direction(deg){return ['北','東北','東','東南','南','西南','西','西北'][Math.round(deg/45)%8];}
 function age(stamp){const min=Math.max(0,Math.floor((Date.now()/1000-stamp)/60));return min<1?'剛剛':min<60?`${min} 分鐘前`:`${Math.floor(min/60)} 小時前`;}
-function avatar(name,index=0){return `<span class="avatar ${['','orange','blue'][index%3]}">${esc([...name][0]||'友')}</span>`;}
 function currentSquad(){return state.squads.find(s=>s.id===state.mine.squad);}
 
 async function initMap(forceLeaflet=false){
@@ -300,7 +298,6 @@ function render(){
   TamagoVue.renderControl($('#filters'),{kind:'filters',items:state.tab==='tasks'?Object.entries({all:'全部',...types,mine:'我的任務'}):[],selected:state.filter});
   renderPanel();renderLocation();renderMap();expeditionPage?.sync();
 }
-function empty(title,detail){return `<div class="empty">${icon('spark')}<strong>${esc(title)}</strong>${esc(detail)}</div>`;}
 function renderPanel(){
   const root=$('#panel-content'),q=state.query.toLocaleLowerCase();
   if(state.tab==='friends'){TamagoVue.clearWorkspace(root);friends.mount(root,q);return;}
@@ -813,8 +810,11 @@ document.addEventListener('click',async e=>{
     else if(action==='venue'){showMap();switchVenue(id);}
     else if(action==='switch-room'){const r=state.rooms.find(r=>r.id===id);closeDialog();await enterRoom(r,state.user);showMap();}
     else if(action==='delete-pin')await deletePin(id);
-    else if(action==='leave'){dialog('<h2>結束這一段遠征？</h2><p>退出會撤回你未完成的任務，並放棄已接取的任務。已開啟的好友分享會繼續。持有邀請碼仍可重新加入。</p><button class="button primary full" data-action="confirm-leave">確認退出遠征隊</button><button class="button outline full" data-action="close">留下來</button>');}
-    else if(action==='confirm-leave'){await stopTeamLocation();const departure=await api(`/expeditions/${state.room.id}/membership`,'DELETE');assistance?.sync(departure.help_rooms||[]);closeDialog();resetLobby();render();showMap();focusVenue();try{localStorage.removeItem('tamago-room');}catch{}toast('已退出遠征隊。');}
+    else if(action==='leave'){if(state.authenticated&&!state.demo&&state.room)dialog({kind:'leaveRoom',room:{...state.room},userId:state.user.id});}
+    else if(action==='confirm-leave'){
+      if(!state.authenticated||b.dataset.user!==state.user.id){closeDialog();return;}
+      b.disabled=true;try{await leaveExpeditionFromMenu(id,b.dataset.user);closeDialog();showMap();focusVenue();}finally{b.disabled=false;}
+    }
   }catch(error){toast(error.message);}
 });
 window.addEventListener('tamago-theme-change',()=>map?.setTheme?.());

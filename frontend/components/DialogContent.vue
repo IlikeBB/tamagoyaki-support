@@ -8,7 +8,7 @@ import ServiceFrame from './ServiceFrame.vue';
 import GroundMessageDialog from './GroundMessageDialog.vue';
 defineProps({ model: Object });
 const view = kind => ['auth', 'account', 'settings', 'password'].includes(kind) ? AccountDialogs :
-  ['join', 'squad', 'invite', 'deleteRoom'].includes(kind) ? JoinDialogs : kind === 'publish' ? PublishDialog :
+  ['join', 'squad', 'invite', 'deleteRoom', 'leaveRoom'].includes(kind) ? JoinDialogs : kind === 'publish' ? PublishDialog :
     ['location', 'helpLocation'].includes(kind) ? LocationDialogs : kind === 'appDisplay' ? AppDisplayDialog : kind === 'ground' ? GroundMessageDialog : ServiceFrame;
 </script>
 <template><component :is="view(model.kind)" :model="model" /></template>
