@@ -1,12 +1,18 @@
 'use strict';
 // Friend locations are returned only after mutual acceptance and explicit sharing.
 class FriendsClient {
-  constructor(actions){this.actions=actions;this.writes=Promise.resolve();this.reset();}
+  constructor(actions){
+    this.actions=actions;this.writes=Promise.resolve();this.reset();
+    this.view=new TamagoVue.FriendsView({
+      invite:username=>this.invite(username),
+      act:async(action,id)=>{const uid=this.actions.user()?.id;await this.act(action,id);if(uid===this.actions.user()?.id)this.actions.acted?.(action);}
+    });
+  }
   reset(){
     this.generation=(this.generation||0)+1;this.ownerId=null;this.sharing=false;this.syncing=false;
-    this.data={friends:[],incoming:[],outgoing:[],sharing:false};this.syncedAt=0;this.lastSent=0;this.lastSampleAt=0;this.error='';
+    this.data={friends:[],incoming:[],outgoing:[],sharing:false};this.syncedAt=0;this.lastSent=0;this.lastSampleAt=0;this.error='';this.view?.reset();
   }
-  ready(){return !!this.actions.user()&&navigator.onLine&&!document.hidden&&this.syncedAt>0&&Date.now()-this.syncedAt<=20000;}
+  ready(){return !!this.actions.user()&&this.ownerId===this.actions.user().id&&navigator.onLine&&!document.hidden&&this.syncedAt>0&&Date.now()-this.syncedAt<=20000;}
   targets(){
     if(!this.ready())return [];
     return this.data.friends.filter(p=>p.location_visible&&Number.isFinite(p.lat)&&Number.isFinite(p.lng)&&LocationState.valid(p.located))
@@ -14,7 +20,7 @@ class FriendsClient {
   }
   async sync({fresh=false}={}){
     const user=this.actions.user();if(!user||document.hidden)return;
-    if(this.ownerId!==user.id){this.reset();this.ownerId=user.id;}
+    if(this.ownerId!==user.id){this.reset();this.ownerId=user.id;this.actions.changed();}
     const generation=this.generation;
     if(this.syncing){
       await this.syncing;
@@ -23,10 +29,10 @@ class FriendsClient {
     }
     this.syncing=(async()=>{
     try{
-      const data=await this.actions.api('/friends');if(generation!==this.generation)return;
+      const data=await this.actions.api('/friends');if(generation!==this.generation||user.id!==this.actions.user()?.id)return;
       this.data=data;this.syncedAt=Date.now();this.error='';this.actions.changed();
     }catch(error){
-      if(generation!==this.generation)return;
+      if(generation!==this.generation||user.id!==this.actions.user()?.id)return;
       this.syncedAt=0;this.error=error.status===401?'登入已失效，請重新登入。':'好友暫時無法同步，位置已隱藏。';
       if(error.status===401){this.reset();this.actions.expired();}
       this.actions.changed();
@@ -49,11 +55,12 @@ class FriendsClient {
     try{if(remote&&was&&this.actions.user())await this.actions.api('/friends/location','DELETE');}
     finally{this.data.sharing=false;this.lastSent=0;this.lastSampleAt=0;this.actions.stopped?.();this.actions.changed();}
   }
-  async invite(form){
-    await this.actions.submit(form,async()=>{
-      await this.actions.api('/friends/requests','POST',{username:new FormData(form).get('username')});
-      form.reset();await this.sync({fresh:true});this.actions.toast('好友邀請已送出，等待對方接受。');
-    });
+  async invite(username){
+    const generation=this.generation,uid=this.actions.user()?.id;if(!uid)return;
+    await this.actions.api('/friends/requests','POST',{username});
+    if(generation!==this.generation||uid!==this.actions.user()?.id)return;
+    await this.sync({fresh:true});
+    if(generation===this.generation&&uid===this.actions.user()?.id)this.actions.toast('好友邀請已送出，等待對方接受。');
   }
   async act(action,id){
     if(action==='friend-share'){
@@ -62,33 +69,27 @@ class FriendsClient {
     }else if(action==='friend-find')this.actions.find('friend:'+id);
     else if(action==='friend-chat')await this.actions.chat(id);
     else{
+      const generation=this.generation,uid=this.actions.user()?.id;if(!uid)return;
       const operation=action==='friend-accept'?'accept':action==='friend-reject'?'reject':null;
       await this.actions.api('/friends/'+encodeURIComponent(id)+(operation?'/'+operation:''),operation?'POST':'DELETE');
-      await this.sync({fresh:true});this.actions.toast(action==='friend-accept'?'已成為好友，開啟位置分享就能互相找人。':action==='friend-reject'?'已拒絕好友邀請。':'已移除，不再向對方提供位置。');
+      if(generation!==this.generation||uid!==this.actions.user()?.id)return;
+      await this.sync({fresh:true});if(generation!==this.generation||uid!==this.actions.user()?.id)return;this.actions.toast(action==='friend-accept'?'已成為好友，開啟位置分享就能互相找人。':action==='friend-reject'?'已拒絕好友邀請。':'已移除，不再向對方提供位置。');
     }
   }
   mount(root,query=''){
-    const esc=this.actions.escape,user=this.actions.user();
-    if(!user){
-      root.innerHTML='<div class="empty"><strong>和好友，隨時會合。</strong><p>登入後用帳號名稱加入好友，不必加入遠征隊或小隊。</p><button class="button dark" data-action="account">登入或註冊</button></div>';return;
-    }
-    if(!root.querySelector('#friends-panel')){
-      root.innerHTML=`<div id="friends-panel"><div class="friends-intro"><p>你的帳號：<b>@${esc(user.username)}</b></p><p>成為好友後，對方開啟位置分享就會顯示在地圖上。</p></div><form id="friend-invite-form"><label for="friend-username">加入好友</label><div class="friend-invite-fields"><input id="friend-username" name="username" autocomplete="off" autocapitalize="none" spellcheck="false" required minlength="3" maxlength="32" pattern="[A-Za-z0-9][A-Za-z0-9_.-]{2,31}" placeholder="輸入好友的帳號名稱"><button class="button dark" type="submit">送出邀請</button></div><div class="form-error" role="alert"></div></form><div class="friend-sharing"><div><strong>我的好友位置分享</strong><small id="friend-share-status"></small></div><button id="friend-share-toggle" class="button outline" role="switch" aria-checked="false" data-action="friend-share">開啟分享</button></div><p id="friend-sync-status" class="friend-sync-status" role="status"></p><div id="friend-requests"></div><div id="friend-list"></div></div>`;
-      root.querySelector('#friend-invite-form').addEventListener('submit',event=>{event.preventDefault();this.invite(event.target);});
-    }
-    const active=this.sharing||this.data.sharing,toggle=root.querySelector('#friend-share-toggle');
-    toggle.setAttribute('aria-checked',String(active));toggle.textContent=active?'關閉分享':'開啟分享';
-    root.querySelector('#friend-share-status').textContent=this.sharing?'目前與已接受的好友分享':this.data.sharing?'另一個頁面正在分享位置':'目前未分享你的位置';
-    root.querySelector('#friend-sync-status').textContent=this.error||(!this.ready()?'正在同步好友…':'');
-    const row=(p,buttons,note)=>`<article class="friend-row">${profileAvatar(p.nickname,p.id,p.avatar_url)}<div class="friend-info"><strong>${esc(p.nickname)}</strong><small>@${esc(p.username)}</small><small>${note}</small></div><div class="friend-actions">${buttons}</div></article>`;
-    const button=(p,action,label)=>`<button data-action="${action}" data-id="${esc(p.id)}">${label}</button>`;
-    const requests=root.querySelector('#friend-requests');
-    const html=(this.data.incoming.length?'<h2 class="friend-section-title">收到的邀請</h2>'+this.data.incoming.map(p=>row(p,button(p,'friend-accept','接受')+button(p,'friend-reject','拒絕'),'等待你接受')).join(''):'')+
-      (this.data.outgoing.length?'<h2 class="friend-section-title">送出的邀請</h2>'+this.data.outgoing.map(p=>row(p,button(p,'friend-remove','取消'),'等待對方接受')).join(''):'');
-    if(requests.dataset.html!==html){requests.innerHTML=html;requests.dataset.html=html;}
-    const visible=new Set(this.targets().map(t=>t.owner));
-    const people=this.data.friends.filter(p=>[p.nickname,p.username].some(text=>text?.toLocaleLowerCase().includes(query)));
-    const list=root.querySelector('#friend-list'),listHtml=`<h2 class="friend-section-title">我的好友 · ${this.data.friends.length}</h2>`+(people.map(p=>row(p,(visible.has(p.id)?button(p,'friend-find','查看位置'):'')+button(p,'friend-chat','聊天')+button(p,'friend-remove','移除'),visible.has(p.id)?(LocationState.stale(p.located)?`最後位置 · ${LocationState.age(p.located)}`:'正在分享位置'):'尚未分享位置或位置已過期')).join('')||'<p class="field-note">'+(query?'沒有符合的好友。':'輸入好友帳號，邀請熟悉的夥伴。')+'</p>');
-    if(list.dataset.html!==listHtml){list.innerHTML=listHtml;list.dataset.html=listHtml;}
+    const user=this.actions.user(),own=user&&this.ownerId===user.id;
+    const data=own?this.data:{friends:[],incoming:[],outgoing:[],sharing:false};
+    const visible=new Set(this.targets().map(target=>target.owner));
+    this.view.update({
+      user:user?{...user}:null,query,
+      friends:data.friends.map(person=>({...person,canFind:visible.has(person.id),note:visible.has(person.id)?
+        (LocationState.stale(person.located)?`最後位置 · ${LocationState.age(person.located)}`:'正在分享位置'):'尚未分享位置或位置已過期'})),
+      incoming:data.incoming.map(person=>({...person})),outgoing:data.outgoing.map(person=>({...person})),
+      sharing:!!(own&&(this.sharing||data.sharing)),
+      shareStatus:own&&this.sharing?'目前與已接受的好友分享':data.sharing?'另一個頁面正在分享位置':'目前未分享你的位置',
+      syncStatus:this.error||(!this.ready()?'正在同步好友…':'')
+    });
+    this.view.mount(root);
   }
+  unmount(){this.view.unmount();}
 }

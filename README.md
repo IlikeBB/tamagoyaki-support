@@ -1,13 +1,13 @@
 # 玉子燒支援隊 · Tamagoyaki Support
 
-手機優先的遠征會合網頁。Python FastAPI、SQLite，遠征隊頁面與聊天介面使用 Vue 3，其餘前端沿用原生 JavaScript；底圖支援 Google Maps 與自架 Leaflet 1.9.4。正式網址：https://tamagoyaki-support.modoubletw.com/
+手機優先的遠征會合網頁。Python FastAPI、SQLite，遠征隊頁面、聊天與好友介面使用 Vue 3，其餘前端沿用原生 JavaScript；底圖支援 Google Maps 與自架 Leaflet 1.9.4。正式網址：https://tamagoyaki-support.modoubletw.com/
 
 ## 專案結構
 
 - `backend/`：Python 後端、資料存取與啟動入口。
 - `tests/`：Python 單元與整合測試。
 - `static/`：網頁介面、樣式、圖示及地圖資源。
-- `frontend/`：Vue 單檔元件、遠征隊頁面與 Vite 建置設定。
+- `frontend/`：Vue 單檔元件、介面銜接層與 Vite 建置設定。
 - `scripts/`：部署腳本與瀏覽器驗證工具。
 - `assets/`：地圖原始素材。
 
@@ -184,7 +184,9 @@ iPhone／iPad 主畫面模式（`navigator.standalone`）使用 `100vh` 作為�
 
 ### Vue 前端建置
 
-`vue-version` 分支已將遠征隊頁面與聊天介面改為 Vue 元件，沿用原有 API、驗證及導覽。共用入口為 `frontend/main.js`，元件放在 `frontend/components/`；`frontend/expeditions-page.js` 與 `frontend/chat-view.js` 負責和既有程式銜接。聊天的權限、同步、去重傳送與草稿管理仍由 `static/chat.js` 負責，Vue 接手對話列表、頭貼、訊息與輸入區；訊息更新等待 Vue 完成繪製後再計算捲動及已讀。
+`vue-version` 分支已將遠征隊頁面、聊天與好友介面改為 Vue 元件，沿用原有 API、驗證及導覽。共用入口為 `frontend/main.js`，元件放在 `frontend/components/`；`frontend/expeditions-page.js`、`frontend/chat-view.js` 與 `frontend/friends-view.js` 負責和既有程式銜接。聊天的權限、同步、去重傳送與草稿管理仍由 `static/chat.js` 負責，Vue 接手對話列表、頭貼、訊息與輸入區；訊息更新等待 Vue 完成繪製後再計算捲動及已讀。
+
+好友介面包含搜尋結果、收到／送出邀請、好友列表、頭貼、聊天入口及位置分享開關。`static/friends.js` 保留好友 API、位置同步與有效期限判斷；Vue 管理表單草稿、錯誤與操作狀態。同步時以成員 ID 保留列與焦點，切換頁籤會卸載 Vue，返回時保留未送出的邀請帳號；登出或切換帳號則清除私人資料與草稿，忽略舊請求回應。好友預覽沿用右上角入口，News 與聊天頭像的好友邀請仍使用既有流程。
 
 修改 Vue 原始碼後執行：
 
@@ -193,7 +195,7 @@ npm ci --ignore-scripts
 npm run build
 ```
 
-建置會產生 `static/vue/app.js`、第三方授權檔，並依內容雜湊更新 `static/index.html` 的載入版本。頁面與聊天共用同一份 Vue runtime。這些建置產物須與原始碼一起提交。Python 部署可直接服務已建置的檔案，執行時不需要 Node.js。Vue 模板在建置時編譯，沿用既有 CSP，不加入 `unsafe-eval`。
+建置會產生 `static/vue/app.js`、第三方授權檔，並依內容雜湊更新 `static/index.html` 的載入版本。所有 Vue 介面共用同一份 runtime。這些建置產物須與原始碼一起提交。Python 部署可直接服務已建置的檔案，執行時不需要 Node.js。Vue 模板在建置時編譯，沿用既有 CSP，不加入 `unsafe-eval`。
 
 在使用獨立資料庫的 `http://127.0.0.1:8079` 伺服器驗證 Vue 版：
 
@@ -204,6 +206,8 @@ node scripts/expeditions-page-test.mjs
 node scripts/expeditions-vue-test.mjs
 node scripts/chat-test.mjs
 node scripts/chat-vue-test.mjs
+node scripts/friends-ui-test.mjs
+node scripts/friends-vue-test.mjs
 node scripts/squad-chat-test.mjs
 node scripts/chat-avatars-test.mjs
 node scripts/chat-friend-news-test.mjs

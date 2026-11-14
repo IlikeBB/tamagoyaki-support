@@ -362,6 +362,7 @@ function renderPinRow(p){
 function renderPanel(){
   const root=$('#panel-content'),q=state.query.toLocaleLowerCase();
   if(state.tab==='friends'){friends.mount(root,q);return;}
+  friends?.unmount();
   const match=x=>[x.title,x.description,x.nickname,x.owner_name].some(v=>v?.toLocaleLowerCase().includes(q));
   if(state.tab==='tasks'){
     const tasks=state.tasks.filter(t=>['open','accepted'].includes(t.status)&&match(t)&&(state.filter==='all'||state.filter===t.kind||(state.filter==='mine'&&(t.owner===state.user.id||t.assignee===state.user.id))));
@@ -969,7 +970,7 @@ async function init(){
     changed:status=>{if(status==='off'){if(state.scope==='help'){state.scope='off';state.position=null;}}else{state.scope='help';if(status==='denied')state.position=null;}if(config){renderLocation();renderMap();}},
     position:p=>{state.scope='help';lastPositionAt=p.timestamp;state.position={lat:p.coords.latitude,lng:p.coords.longitude,accuracy:p.coords.accuracy};if(centerOnLocationFix){centerOnLocationFix=false;showPositionOnMap(state.position);}renderLocation();renderMap();}
   });
-  friends=new FriendsClient({api,escape:esc,submit,toast,user:()=>state.authenticated?state.user:null,location:showLocation,chat:id=>chat.open('friend',id),find:id=>selectTarget('friend',id),stopped:()=>{if(state.scope==='friends')state.scope='local';else if(state.scope==='friends_squad'){state.scope=currentSquad()?'squad':'local';locationSquadId=currentSquad()?.id||null;}},changed:()=>{syncNewsFriends();if(!config)return;$('#friend-count').textContent=friends.data.friends.length;if(state.tab==='friends')renderPanel();renderMap();},expired:()=>{state.authenticated=false;state.user={id:'me',nickname:'你'};resetLobby();render();toast('登入已失效，請重新登入。');}});
+  friends=new FriendsClient({api,toast,acted:action=>{if(action!=='friend-chat')chat.tick();renderLocation();},user:()=>state.authenticated?state.user:null,location:showLocation,chat:id=>chat.open('friend',id),find:id=>selectTarget('friend',id),stopped:()=>{if(state.scope==='friends')state.scope='local';else if(state.scope==='friends_squad'){state.scope=currentSquad()?'squad':'local';locationSquadId=currentSquad()?.id||null;}},changed:()=>{syncNewsFriends();if(!config)return;$('#friend-count').textContent=friends.data.friends.length;if(state.tab==='friends')renderPanel();renderMap();},expired:()=>{state.authenticated=false;state.user={id:'me',nickname:'你'};resetLobby();render();toast('登入已失效，請重新登入。');}});
   finder=new TeammateFinder($('#teammate-finder'),{join:()=>showJoin(),friends:()=>setTab('friends'),tasks:()=>setTab('tasks'),refresh:()=>{refresh();friends.sync();},location:()=>showLocation(),compass:()=>compass(),map:showFinderTaskOnMap,distance,bearing,meters,direction});
   renderFinder();setInterval(refreshTeammateGuidance,1000);
   try{

@@ -57,6 +57,10 @@
 @media(max-width:700px){.demo-banner{top:66px}}
 .friend-map-point{background:var(--green)}
 .friends-intro{padding:14px;border:1px solid #d8e3d0;border-radius:9px;background:var(--green-soft);font-size:12px}
+/* Vue friends panel keeps controls usable on touch screens. */
+#friends-panel .friend-actions button,#friends-panel .friend-sharing .button,#friends-panel .friend-invite-fields .button,#friends-panel .avatar.profile-link{min-height:44px}
+#friends-panel .avatar.profile-link{width:44px;height:44px;min-width:44px}
+#friends-panel .friend-invite-fields input{font-size:16px}
 .friends-intro strong{display:block;font-size:13px}.friends-intro p{margin:6px 0 0;color:var(--muted);font-size:11px;overflow-wrap:anywhere}.friends-intro b{color:var(--green)}
 .friend-invite-fields{display:flex;gap:7px;margin-top:6px}.friend-invite-fields input{min-width:0;margin-top:0!important;font-size:12px}.friend-invite-fields .button{font-size:11px;padding:8px 10px}
 .friend-sharing{display:flex;align-items:center;gap:10px;padding:14px 0 6px;border-top:1px solid var(--line)}.friend-sharing>div{flex:1;min-width:0}.friend-sharing strong{font-size:12px;display:block}.friend-sharing small{font-size:10px;color:var(--muted);display:block}.friend-sharing .button{font-size:11px;padding:8px 10px;min-height:38px}.friend-sharing [aria-checked=true]{background:var(--green);color:white}
