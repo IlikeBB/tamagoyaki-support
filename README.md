@@ -239,7 +239,7 @@ node scripts/squad-friend-invites-test.mjs
 
 原 `F:\work_project\tamagoyaki_support` 的 `main` checkout 已停止服務；其資料是切換前的版本，後續不會同步。從 Codex 或其他會清理子程序的終端啟動正式站，使用 Vue 目錄內的 `scripts/start-public-detached.ps1`；它以隱藏的獨立 Windows 程序呼叫既有啟動腳本，結果寫入 `.run-logs/launcher.log`。手動終端仍可使用 `scripts/start-public.ps1`，停止使用 `scripts/stop-public.ps1`。若需回復版本，必須先停止 Vue 服務並保留最新正式資料，再切換程式，不能直接用舊資料庫覆蓋。
 
-舊 RPG 介面繪製檔及未使用的第一版幕張覆蓋圖已移除；實際使用的 v2 場館素材與原始製圖素材保留。一次性遷移腳本、舊 QA 資料與切換備份移至專案外的 `F:\work_project\artifacts\tamagoyaki-support-archive`，本機 `.run-logs/vue-deployment.json` 記錄這次備份路徑。舊的 36 支獨立業務腳本已移除；前端原始碼與服務皆由 Vue 應用匯入，`static/` 僅保留建置產物、樣式、素材、SDK 與 service worker。
+舊 RPG 介面繪製檔、未使用的第一版幕張覆蓋圖、已完成的遷移清單及過時的預覽／驗證腳本已移除；實際使用的 v2 場館素材與原始製圖素材保留。切換備份保存在專案外的 `F:\work_project\artifacts\tamagoyaki-support-archive`，本機 `.run-logs/managed-deployment.json` 記錄目前部署與備份路徑。舊的 36 支獨立業務腳本已移除；前端原始碼與服務皆由 Vue 應用匯入，`static/` 僅保留建置產物、樣式、素材、SDK 與 service worker。`artifacts/` 的截圖與測試報告、Python `__pycache__/` 可在驗證後清除；正式資料、設定、執行中的日誌和必要的測試／建置工具保留。
 
 可執行 `node scripts/audit-vue-project.mjs` 核對 Vue 元件引用、唯一應用入口、靜態資源與舊 HTML 繪製程式殘留。`node scripts/run-vue-qa.mjs vue-lifecycle-test` 驗證卸載時清除資源、取消請求、攔截舊 GPS 回呼，及重新掛載時建立新狀態。只有隔離的 loopback 8079 會安裝測試橋接，正式網址與 8078 不公開業務狀態。正式網址只執行 `node scripts/production-smoke.mjs` 的唯讀檢查，使用新的訪客瀏覽器並阻擋所有寫入；涵蓋實際 Vue bundle、Google Maps、五個場館標記、縮放、遠征隊瀏覽、設定及註冊表單、明暗模式與 320–1440 像素版面。
 
