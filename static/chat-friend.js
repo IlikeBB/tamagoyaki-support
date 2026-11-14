@@ -13,7 +13,7 @@ class ChatFriendCard {
     this.profile=null;this.busy=false;this.status.textContent='';this.button.hidden=true;
     this.root.querySelector('[data-friend-news]').hidden=true;this.root.querySelector('[data-friend-retry]').hidden=true;
     this.root.querySelector('[data-friend-name]').textContent='';this.root.querySelector('[data-friend-username]').textContent='';
-    this.root.querySelector('[data-friend-avatar]').replaceChildren();
+    TamagoVue.renderControl(this.root.querySelector('[data-friend-avatar]'),{kind:'avatar',name:'',url:''});
   }
   identity(){
     const owner=this.actions.user()?.id||null;if(owner===this.owner)return;
@@ -36,8 +36,7 @@ class ChatFriendCard {
     if(!this.profile)return;
     const profile=this.profile,root=this.root,portrait=root.querySelector('[data-friend-avatar]');
     root.querySelector('[data-friend-name]').textContent=profile.nickname;root.querySelector('[data-friend-username]').textContent='@'+profile.username;
-    portrait.textContent=[...(profile.nickname||'夥伴')][0];
-    if(profile.avatar_url){const image=document.createElement('img');image.src=profile.avatar_url;image.alt='';image.onerror=()=>image.remove();portrait.append(image);}
+    TamagoVue.renderControl(portrait,{kind:'avatar',name:profile.nickname,url:profile.avatar_url});
     const snapshot=this.actions.friends();this.button.hidden=true;root.querySelector('[data-friend-news]').hidden=true;
     if(!snapshot){this.status.textContent='好友狀態暫時無法確認，請重新載入。';root.querySelector('[data-friend-retry]').hidden=false;return;}
     if(snapshot.friends.some(p=>p.id===profile.id))this.status.textContent='你們已經是好友。';

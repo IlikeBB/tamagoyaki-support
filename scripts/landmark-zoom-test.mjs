@@ -1,5 +1,5 @@
 import {chromium,expect} from '@playwright/test';
-const origin=process.argv[2]||'https://tamagoyaki-support.modoubletw.com';
+const origin=process.env.QA_ORIGIN||process.argv[2]||'https://tamagoyaki-support.modoubletw.com';
 if(!['http://127.0.0.1:8079','https://tamagoyaki-support.modoubletw.com'].includes(origin))throw Error('Unexpected origin.');
 const browser=await chromium.launch({headless:true,executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'}),errors=[],writes=[],checks=[];
 const user={id:'zoom-viewer',nickname:'縮放驗證',username:'preview'},room={id:'zoom-room',owner:user.id,name:'地標縮放驗證',venue:'makuhari',event_date:''};

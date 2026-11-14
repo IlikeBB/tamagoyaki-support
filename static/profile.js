@@ -15,10 +15,10 @@ class ProfileClient {
   async open(uid='me'){
     if(!this.identity())return this.actions.login(uid);
     this.generation++;this.recordRequest++;this.loadingRecords=false;this.uid=uid==='me'?this.owner:uid;this.tab='wall';this.editing=false;this.draft=null;this.data=null;this.items=[];this.contentConfirmation=null;
-    this.root.querySelector('#profile-crop').hidden=true;this.view.scroll.hidden=false;this.view.body.replaceChildren();this.root.querySelector('#profile-edit').hidden=true;this.root.querySelector('#profile-settings').hidden=true;this.root.querySelector('#news-launcher').hidden=true;
+    this.root.querySelector('#profile-crop').hidden=true;this.view.scroll.hidden=false;this.view.clear();this.root.querySelector('#profile-edit').hidden=true;this.root.querySelector('#profile-settings').hidden=true;this.root.querySelector('#news-launcher').hidden=true;
     if(!this.root.open){this.view.opener=document.activeElement;this.root.showModal();}this.view.fit();await this.load();
   }
-  closed(){this.generation++;this.recordRequest++;this.loadingRecords=false;this.crop.clear();this.data=null;this.draft=null;this.items=[];this.uid=null;this.contentConfirmation=null;this.view.body.replaceChildren();this.view.status('');}
+  closed(){this.generation++;this.recordRequest++;this.loadingRecords=false;this.crop.clear();this.data=null;this.draft=null;this.items=[];this.uid=null;this.contentConfirmation=null;this.view.clear();this.view.status('');}
   navigate(action){this.root.close();Promise.resolve(action()).catch(error=>this.actions.toast(error.message));}
   async load(){
     if(!this.uid||!this.identity())return;
@@ -52,8 +52,7 @@ class ProfileClient {
   }
   async selectTab(tab){
     if(!this.data||!['wall','tasks','landmarks','messages'].includes(tab)||tab!=='wall'&&!this.data.profile.own)return;this.recordRequest++;this.loadingRecords=false;this.tab=tab;this.items=[];this.next=null;this.contentConfirmation=null;
-    this.root.querySelectorAll('[data-profile-action=tab]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.tab===tab)));
-    this.root.querySelector('#profile-records')?.replaceChildren();this.root.querySelector('#profile-more').hidden=true;await this.records();
+    this.view.selectTab(tab);await this.records();
   }
   async records(more=false){
     if(!this.uid||this.editing||this.loadingRecords)return;

@@ -3,6 +3,7 @@
 class TeammateFinder {
   constructor(root,actions){
     this.root=root;this.actions=actions;this.launcher=document.querySelector('#finder-launcher');
+    TamagoVue.renderFinderBody(root.querySelector('#finder-body'),{tasks:[],ready:false,target:null});
     this.select=root.querySelector('#finder-person');this.body=root.querySelector('#finder-body');
     this.grip=root.querySelector('#finder-grip');this.collapsed=false;this.selectedId=null;this.optionsKey='';
     this.model={tasks:[],ready:false,roomId:null};this.drag=null;
@@ -66,32 +67,13 @@ class TeammateFinder {
   target(){return this.model.ready?this.model.tasks.find(t=>t.id===this.selectedId):null;}
   text(id,value){const el=this.root.querySelector('#'+id);if(el.textContent!==value)el.textContent=value;}
   render(){
-    const m=this.model,t=this.target(),key=JSON.stringify(m.tasks.map(t=>[t.id,t.owner_name,t.title]));
-    if(key!==this.optionsKey){
-      this.select.replaceChildren(new Option('選擇好友、成員或任務',''),...m.tasks.map(t=>new Option(`${t.owner_name} · ${t.title}`,t.id)));this.optionsKey=key;
-    }
-    this.select.value=this.selectedId||'';this.select.disabled=!m.ready||!m.tasks.length;
-    this.root.querySelector('#finder-detail').hidden=!t;this.root.querySelector('#finder-empty').hidden=!!t;
-    const emptyAction=this.root.querySelector('#finder-empty-action');emptyAction.hidden=!!t||!!m.tasks.length;
+    const m=this.model,t=this.target(),valid=!!t&&!!m.position,ownStale=LocationState.stale(m.positionLocated);
     const message=m.guest?'登入後可加入好友、小隊或遠征隊，在這裡找人。':!m.ready?'等待重新同步，暫停顯示位置。':this.revoked?'對方已停止分享或任務已結束，請選擇其他對象。':m.tasks.length?'請選擇已分享位置的好友、成員或已接任務。':'目前沒有可尋找的人。請好友或小隊成員開啟分享，或接取隊友任務。';
-    this.text('finder-empty-message',message);emptyAction.textContent=m.guest?'選擇遠征隊':!m.ready?'重新同步':'查看好友';
-    this.text('finder-summary',t?t.owner_name:'');
-    if(!t){
-      for(const id of ['finder-name','finder-task','finder-distance','finder-direction','finder-source','finder-accuracy'])this.text(id,'');
-      this.root.querySelector('#finder-arrow').style.transform='';this.root.querySelector('#finder-guidance').hidden=true;return;
-    }
-    this.text('finder-name',t.owner_name);this.text('finder-task',t.title);
-    this.text('finder-source',LocationState.source(t));
-    const valid=!!m.position;this.root.querySelector('#finder-guidance').hidden=!valid;
-    this.root.querySelector('#finder-needs-location').hidden=valid;
-    const ownStale=LocationState.stale(m.positionLocated);
-    this.text('finder-accuracy',valid?`${ownStale?`依你的最後位置（${LocationState.age(m.positionLocated)}）估算 · `:''}你的精度 ±${Math.round(m.position.accuracy||0)}m${t.accuracy!=null?` · 對方 ±${Math.round(t.accuracy)}m`:''}`:'');
-    if(valid){
-      const b=this.actions.bearing(m.position,t),d=this.actions.distance(m.position,t),relative=(b-(m.heading??0)+360)%360;
-      this.text('finder-distance',`${ownStale||LocationState.lastKnown(t)?'約 ':''}${this.actions.meters(d)}`);
-      this.text('finder-direction',`${this.actions.direction(b)} · ${m.heading==null?'北朝上':'相對手機朝向'}`);
-      this.root.querySelector('#finder-arrow').style.transform=`rotate(${relative}deg)`;
-      this.text('finder-summary',`${t.owner_name} · ${this.actions.meters(d)}`);
-    }else{this.text('finder-distance','');this.text('finder-direction','');this.root.querySelector('#finder-arrow').style.transform='';}
+    const b=valid?this.actions.bearing(m.position,t):null,d=valid?this.actions.distance(m.position,t):null;
+    TamagoVue.renderFinderBody(this.body,{tasks:m.tasks.map(t=>({...t})),selectedId:this.selectedId,ready:m.ready,target:t?{...t}:null,message,
+      emptyAction:m.guest?'選擇遠征隊':!m.ready?'重新同步':'查看好友',valid,source:t?LocationState.source(t):'',relative:valid?(b-(m.heading??0)+360)%360:null,
+      distance:valid?`${ownStale||LocationState.lastKnown(t)?'約 ':''}${this.actions.meters(d)}`:'',direction:valid?`${this.actions.direction(b)} · ${m.heading==null?'北朝上':'相對手機朝向'}`:'',
+      accuracy:valid?`${ownStale?`依你的最後位置（${LocationState.age(m.positionLocated)}）估算 · `:''}你的精度 ±${Math.round(m.position.accuracy||0)}m${t.accuracy!=null?` · 對方 ±${Math.round(t.accuracy)}m`:''}`:''});
+    this.text('finder-summary',t?valid?`${t.owner_name} · ${this.actions.meters(d)}`:t.owner_name:'');
   }
 }

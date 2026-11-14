@@ -2,7 +2,7 @@ import {chromium,expect} from '@playwright/test';
 import {randomBytes} from 'node:crypto';
 import fs from 'node:fs';
 const origin='http://127.0.0.1:8079';if(process.env.QA_ORIGIN!==origin)throw Error('Use isolated QA port 8079.');
-const fixture=JSON.parse(fs.readFileSync('artifacts/site-admin-qa.local.json','utf8'));
+const fixture=JSON.parse(fs.readFileSync(process.env.QA_ADMIN_FIXTURE||'artifacts/site-admin-qa.local.json','utf8'));
 const browser=await chromium.launch({headless:true,executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'}),errors=[];
 async function api(page,path,method='GET',data){const response=await page.request.fetch(origin+'/api'+path,{method,data,headers:{'X-Tamago-Client':'web',Origin:origin}});expect(response.ok(),`${path}: ${response.status()}`).toBe(true);return response.json();}
 try{

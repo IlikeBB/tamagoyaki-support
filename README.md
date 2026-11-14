@@ -1,6 +1,6 @@
 # 玉子燒支援隊 · Tamagoyaki Support
 
-手機優先的遠征會合網頁。Python FastAPI、SQLite，遠征隊頁面、聊天與好友介面使用 Vue 3，其餘前端沿用原生 JavaScript；底圖支援 Google Maps 與自架 Leaflet 1.9.4。正式網址：https://tamagoyaki-support.modoubletw.com/
+手機優先的遠征會合網頁。Python FastAPI、SQLite，介面使用 Vue 3；底圖支援 Google Maps 與自架 Leaflet 1.9.4。正式網址：https://tamagoyaki-support.modoubletw.com/
 
 ## 專案結構
 
@@ -184,7 +184,18 @@ iPhone／iPad 主畫面模式（`navigator.standalone`）使用 `100vh` 作為�
 
 ### Vue 前端建置
 
-`vue-version` 分支已將遠征隊頁面、聊天與好友介面改為 Vue 元件，沿用原有 API、驗證及導覽。共用入口為 `frontend/main.js`，元件放在 `frontend/components/`；`frontend/expeditions-page.js`、`frontend/chat-view.js` 與 `frontend/friends-view.js` 負責和既有程式銜接。聊天的權限、同步、去重傳送與草稿管理仍由 `static/chat.js` 負責，Vue 接手對話列表、頭貼、訊息與輸入區；訊息更新等待 Vue 完成繪製後再計算捲動及已讀。
+`vue-version` 分支的介面由 Vue 元件繪製，沿用原有 API、驗證及導覽。共用入口為 `frontend/main.js`，元件放在 `frontend/components/`。`AppShell.vue` 包含導覽、地圖控制與對話框的版面；`static/index.html` 保留文件設定與載入入口，Vue 在其餘 deferred 控制器啟動前建立版面。
+
+| 介面 | 元件／銜接層 |
+| --- | --- |
+| 個人檔案、展示牆、任務／地標／留言管理 | `ProfileContent.vue`、`profile-view.js` |
+| 任務、評價、情報點、小隊與成員 | `WorkspacePanel.vue`、`SquadPanel.vue`、`FeedbackControls.vue` |
+| 登入註冊、設定、建立加入、發布與定位表單 | `DialogContent.vue` 與各類 Dialog 元件 |
+| 遠征隊管理、成員預覽、帳號管理、黑名單、審核 | `ServiceFrame.vue`、`ManagementList.vue`、`RoomSettingsContent.vue` |
+| News、好友邀請、地標留言與小隊邀請 | `NewsList.vue`、`ContentList.vue` |
+| 地圖搜尋、追蹤方向卡、尋人浮窗、雷達與地圖標記 | `PlaceResults.vue`、`TargetCard.vue`、`FinderBody.vue`、`RadarChips.vue`、`MapMarker.vue` |
+
+`frontend/*-view.js` 是 Vue 與既有服務的邊界；`surface.js` 在控制器需要立即取得表單／canvas 時使用 Vue 的同步 render API，不使用執行時模板編譯或 `v-html`。Google Maps／Leaflet 接收 Vue 繪製的 DOM 標記，移除標記時卸載元件。圖片裁切仍由 canvas 處理。導覽、GPS、地圖 SDK、API 請求、權限、同步、重試去重與資料有效期限由原 JavaScript 控制器負責，Python 後端不變。聊天等待 Vue 完成繪製後再計算捲動及已讀。
 
 好友介面包含搜尋結果、收到／送出邀請、好友列表、頭貼、聊天入口及位置分享開關。`static/friends.js` 保留好友 API、位置同步與有效期限判斷；Vue 管理表單草稿、錯誤與操作狀態。同步時以成員 ID 保留列與焦點，切換頁籤會卸載 Vue，返回時保留未送出的邀請帳號；登出或切換帳號則清除私人資料與草稿，忽略舊請求回應。好友預覽沿用右上角入口，News 與聊天頭像的好友邀請仍使用既有流程。
 
@@ -197,7 +208,15 @@ npm run build
 
 建置會產生 `static/vue/app.js`、第三方授權檔，並依內容雜湊更新 `static/index.html` 的載入版本。所有 Vue 介面共用同一份 runtime。這些建置產物須與原始碼一起提交。Python 部署可直接服務已建置的檔案，執行時不需要 Node.js。Vue 模板在建置時編譯，沿用既有 CSP，不加入 `unsafe-eval`。
 
-在使用獨立資料庫的 `http://127.0.0.1:8079` 伺服器驗證 Vue 版：
+可用以下工具自動啟動 `http://127.0.0.1:8079`，為每支測試建立獨立 SQLite，完成後只關閉該工具建立的伺服器。需要共享 Conda `agent` 環境與 Edge。若 8079 已被其他程式占用，工具會拒絕執行；不影響 8078 正式服務。
+
+```powershell
+node scripts/run-vue-qa.mjs --core
+# 只驗證指定功能：
+node scripts/run-vue-qa.mjs profiles-test map-presence-test site-admin-test
+```
+
+QA 資料庫、報告、管理員測試憑證與截圖存於 Git 忽略的 `artifacts/`。帳號管理測試只在其獨立資料庫註冊測試用 momo，重啟該測試服務後驗證權限；不讀取正式帳號。若已有自行啟動的隔離測試伺服器，也可直接執行個別測試：
 
 ```powershell
 $env:QA_ORIGIN = 'http://127.0.0.1:8079'
@@ -215,6 +234,8 @@ node scripts/squad-friend-invites-test.mjs
 ```
 
 涵蓋建立／加入、成員預覽、日期區間、失敗重試、場館請求競態、帳號切換、搜尋與鍵盤焦點、CSP，以及手機／桌機與黑夜模式。聊天另驗證私訊／遠征隊／小隊權限、傳送重試去重、草稿與頭貼、歷史捲動位置、已讀、輸入法組字、禁言、離線與好友／小隊邀請。會註冊帳號或變更成員的測試僅可對隔離 QA 環境執行。
+
+Vue 開發工作目錄為 `F:\work_project\tamagoyaki_support_vue`，使用 `vue-version` 分支，與原本正式環境的 `main` checkout 分開。該目錄保留未提交的 Google Maps／Cloudflare 本機設定，以及透過 SQLite backup API 取得的正式資料副本；不會搬走或更動原服務的資料。副本不是持續同步的資料庫。執行 QA 工具會另外建立測試資料庫，不使用這份副本。正式服務尚未切換至 Vue 目錄，部署前應重新取得最新資料，不能用舊副本覆蓋持續運作中的資料庫。
 
 ### 功能驗證
 

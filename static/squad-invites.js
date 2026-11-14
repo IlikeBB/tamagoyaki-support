@@ -15,7 +15,7 @@ class SquadInvites {
   mount(root,context){
     if(this.owner!==context.user){this.records.clear();this.owner=context.user;}
     const op={...context,root,people:[],loaded:false,request:0};this.active=op;
-    root.innerHTML='<h3>從好友邀請</h3><p class="field-note">邀請會傳送到好友私訊，對方開啟連結並確認後才加入。</p><div class="squad-invite-filters"><div><label for="squad-friend-query">搜尋好友</label><input id="squad-friend-query" type="search" autocomplete="off" maxlength="80" placeholder="暱稱或帳號" disabled></div><div><label for="squad-friend-filter">篩選</label><select id="squad-friend-filter" disabled><option value="all">全部好友</option><option value="available">可邀請的好友</option><option value="expedition">同遠征隊好友</option></select></div></div><p class="squad-invite-status" role="status" aria-live="polite"></p><button type="button" class="button outline squad-invite-retry" hidden>重新載入好友</button><div class="squad-invite-list"></div>';
+    TamagoVue.renderFrame(root,{kind:'squadInviteFrame'});
     root.querySelector('input').oninput=()=>this.render(op);root.querySelector('select').onchange=()=>this.render(op);
     root.querySelector('.squad-invite-retry').onclick=()=>this.load(op);
     root.querySelector('.squad-invite-list').onclick=event=>{const button=event.target.closest('[data-squad-friend]');if(button&&!button.disabled)this.send(op,button.dataset.squadFriend);};
@@ -37,11 +37,11 @@ class SquadInvites {
     const prefix=this.key(op,''),busy=[...this.records].some(([key,record])=>key.startsWith(prefix)&&record.pending);
     const people=op.people.filter(p=>[p.nickname,p.username].some(value=>value?.normalize('NFKC').toLocaleLowerCase().includes(query))&&(filter!=='available'||!p.in_squad&&!this.records.get(this.key(op,p.id))?.sent)&&(filter!=='expedition'||p.in_expedition));
     const list=op.root.querySelector('.squad-invite-list');
-    list.innerHTML=people.length?people.map(p=>{
-      const record=this.records.get(this.key(op,p.id)),label=p.in_squad?'已在小隊':record?.pending?'傳送中…':record?.sent?'已傳送':'傳送邀請';
-      return `<div class="squad-invite-person">${profileAvatar(p.nickname,p.id,p.avatar_url)}<div><strong>${esc(p.nickname)}</strong><small>@${esc(p.username)} · ${p.in_squad?'同小隊':p.in_expedition?'同遠征隊':'尚未加入此遠征隊'}</small></div><button type="button" data-squad-friend="${esc(p.id)}" aria-label="${esc(p.nickname+' · '+label)}" ${busy||p.in_squad||record?.sent?'disabled':''}>${label}</button></div>`;
-    }).join(''):`<p class="squad-invite-empty">${op.people.length?'沒有符合條件的好友。':'還沒有已互相接受邀請的好友，先到「好友」加入同行夥伴。'}</p>`;
+    TamagoVue.renderList(list,'squadInvites',{items:people.map(person=>{
+      const record=this.records.get(this.key(op,person.id));return {...person,sent:!!record?.sent,label:person.in_squad?'已在小隊':record?.pending?'傳送中…':record?.sent?'已傳送':'傳送邀請'};
+    }),hasFriends:!!op.people.length,busy});
   }
+
   async send(op,id){
     if(!this.alive(op)||!op.loaded||!op.people.some(p=>p.id===id&&!p.in_squad))return;
     const prefix=this.key(op,'');if([...this.records].some(([key,r])=>key.startsWith(prefix)&&r.pending))return;

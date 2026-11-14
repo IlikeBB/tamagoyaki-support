@@ -7,12 +7,13 @@ try{
  const user={id:'receiver',nickname:'你',username:'finder_qa'};
  const task=(id,extra={})=>({id,owner:'captain',owner_name:'小狐 <img src=x>',assignee:'receiver',title:'現場交換',status:'accepted',lat:35.6483,lng:140.0346,created:Date.now()/1000,expires:Date.now()/1000+3600,location_visible:true,location_source:'published',accuracy:null,kind:'trade',...extra});
  const snapshot={room,members:[],squads:[],pins:[],me:{user:'receiver',scope:'off',squad:null},tasks:[task('allowed'),task('live',{location_source:'live',located:Date.now()/1000,accuracy:12}),task('unaccepted',{status:'open',assignee:null,location_visible:false,lat:null,lng:null}),task('other-receiver',{assignee:'stranger',location_visible:false,lat:null,lng:null}),task('own',{owner:'receiver'}),task('expired',{expires:1})]};
- await page.route('**/api/me',route=>route.fulfill({json:{user,expeditions:[room]}}));
+ await page.route('**/api/**',route=>new URL(route.request().url()).pathname==='/api/config'?route.continue():route.fulfill({json:{conversations:[],unread:0,items:[],expeditions:[]}}));
+ await page.route('**/api/me',route=>route.fulfill({json:{user,expeditions:[room],help_rooms:[]}}));
  await page.route('**/api/friends',route=>route.fulfill({json:{friends:[],incoming:[],outgoing:[],sharing:false}}));
  await page.route('**/api/expeditions/finder-ui',route=>route.fulfill({json:snapshot}));
- await page.goto(origin);await expect(page.locator('#finder-launcher')).toBeVisible();
+ await page.goto(origin);await expect(page.locator('#finder-launcher')).toHaveCount(0);
  await expect.poll(()=>page.evaluate(()=>lastTeamSyncAt>0),{timeout:25000}).toBe(true);
- await page.locator('#finder-launcher').click();await expect(page.locator('#teammate-finder')).toBeVisible();
+ await page.locator('#map').focus();await page.evaluate(()=>finder.open('allowed'));await expect(page.locator('#teammate-finder')).toBeVisible();
  await expect(page.locator('#finder-person option')).toHaveCount(3);
  await expect(page.locator('#finder-name')).toHaveText('小狐 <img src=x>');await expect(page.locator('#teammate-finder img')).toHaveCount(0);
  await expect(page.locator('#finder-needs-location')).toBeVisible();await expect(page.locator('#finder-guidance')).not.toBeVisible();
@@ -37,7 +38,7 @@ try{
  await page.context().setOffline(false);await expect(page.locator('#finder-name')).toHaveText('小狐 <img src=x>',{timeout:15000});
  const stale=await page.evaluate(()=>{lastTeamSyncAt=Date.now()-21000;renderFinder();return document.querySelector('#finder-distance').textContent;});expect(stale).toBe('');
  await page.evaluate(()=>refresh());
- const staleGPS=await page.evaluate(()=>{lastPositionAt=Date.now()-121000;renderFinder();return document.querySelector('#finder-guidance').hidden;});expect(staleGPS).toBe(true);
+ const staleGPS=await page.evaluate(()=>{lastPositionAt=Date.now()-901000;renderFinder();return document.querySelector('#finder-guidance').hidden;});expect(staleGPS).toBe(true);
  await page.evaluate(()=>{lastPositionAt=Date.now();renderFinder();});
  for(const width of [320,390,768,1024,1440]){
   await page.setViewportSize({width,height:900});
@@ -47,7 +48,7 @@ try{
  await page.locator('#finder-grip').focus();await page.keyboard.press('Home');await page.screenshot({path:'artifacts/finder-desktop.png'});
  snapshot.tasks=snapshot.tasks.map(t=>({...t,status:'done'}));await page.evaluate(()=>refresh());
  await expect(page.locator('#finder-name')).toHaveText('');await expect(page.locator('#finder-distance')).toHaveText('');await expect(page.locator('#finder-source')).toHaveText('');
- await page.locator('#finder-close').click();await expect(page.locator('#finder-launcher')).toBeFocused();
- await page.keyboard.press('Enter');await expect(page.locator('#finder-empty-message')).toContainText('任務');
+ await page.locator('#finder-close').click();await expect(page.locator('#map')).toBeFocused();
+ await page.evaluate(()=>finder.open());await expect(page.locator('#finder-empty-message')).toContainText('任務');
  expect(errors).toEqual([]);console.log(JSON.stringify({ok:true,checks:['authorized task targets only','safe text rendering','local GPS and compass directions','published/live position labels','pointer and keyboard dragging','collapse across page tabs','offline and stale GPS hide guidance','responsive bounds','revocation clears location','keyboard focus'],errors}));
 }finally{await browser.close();}

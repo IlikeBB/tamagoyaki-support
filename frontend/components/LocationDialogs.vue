@@ -1,0 +1,8 @@
+<script setup>
+import AppIcon from './AppIcon.vue';
+defineProps({ model: Object });
+</script>
+<template>
+  <template v-if="model.kind === 'location'"><h2>{{ model.active ? '定位設定' : '確認你的目前位置。' }}</h2><p>選擇誰可以看到你的即時位置。預設分享給好友與目前小隊，也可選擇其他分享方式。</p><form id="location-form"><fieldset class="location-audiences"><legend>分享對象</legend><label v-for="[value, title, note, disabled] in model.choices" :key="value" class="choice"><input :id="`location-scope-${value}`" name="scope" type="radio" :value="value" :checked="model.selected === value" :disabled="disabled"><span><strong>{{ title }}</strong><small>{{ note }}</small></span></label></fieldset><p class="field-note">切到背景時不會主動停止定位；最後位置保留 15 分鐘，超過 2 分鐘會標示更新時間。背景 GPS 更新依手機系統而定，回到網頁會重新定位。已發布的任務位置仍依接取權限提供；撤回任務可停止提供發布點。</p><div class="form-error" role="alert"></div><button class="button primary full" type="submit">{{ model.active ? '套用分享設定' : '同意並開啟定位' }}</button><button v-if="model.active" class="button outline full" type="button" data-action="stop-location">停止即時定位</button></form></template>
+  <template v-else><h2>求助定位分享中。</h2><p>只有發布求助的遠征隊成員能看到，持續至你刪除最後一個求助任務。求助期間無法切換為小隊、好友限定或本機定位。</p><button v-for="room in model.rooms" :key="room.id" class="room-item" data-action="help-room" :data-id="room.id"><span><strong>{{ room.name }}</strong><small>{{ room.tasks }} 個求助 · 前往刪除求助任務</small></span><AppIcon name="chevron" /></button><p class="field-note">切到背景時不會主動停止求助定位；最後位置保留 15 分鐘，超過 2 分鐘會標示更新時間。手機系統可能暫停背景 GPS；回到網頁會重新定位。</p><button v-if="model.error" class="button primary full" data-action="help-retry">重新開啟求助定位</button><button class="button outline full" data-action="close">關閉設定，維持求助</button></template>
+</template>

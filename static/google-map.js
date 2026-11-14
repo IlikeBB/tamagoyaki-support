@@ -61,7 +61,7 @@ window.TamagoGoogleMap = (() => {
       constructor(point,html,label,onClick){super();this.point=literal(point);this.html=html;this.label=label;this.onClick=onClick;}
       onAdd(){
         const el=document.createElement(this.onClick?'button':'div');
-        el.className='custom-marker google-custom-marker';el.innerHTML=this.html;
+        el.className='custom-marker google-custom-marker';if(this.html instanceof Node)el.append(this.html);else el.textContent=String(this.html||'');
         if(this.onClick){el.type='button';el.addEventListener('click',this.onClick);}
         el.title=this.label;el.setAttribute('aria-label',this.label);
         this.element=el;google.maps.OverlayView.preventMapHitsAndGesturesFrom(el);
@@ -71,7 +71,7 @@ window.TamagoGoogleMap = (() => {
         const p=this.getProjection()?.fromLatLngToDivPixel(new google.maps.LatLng(this.point));
         if(p&&this.element){this.element.style.left=p.x+'px';this.element.style.top=p.y+'px';}
       }
-      onRemove(){this.element?.remove();this.element=null;}
+      onRemove(){TamagoVue.releaseMapMarker(this.html);this.element?.remove();this.element=null;}
     }
     return {Facility,Marker};
   }

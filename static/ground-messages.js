@@ -3,7 +3,7 @@ class GroundMessages {
   constructor(actions){this.actions=actions;}
   open(){
     const actions=this.actions,context=actions.context();if(!context)return actions.join();
-    actions.dialog('<h2>在腳下留一句話。</h2><p>使用目前的 GPS 位置，留給這支遠征隊的隊員閱讀。留言固定在發布點，不會跟著你移動。</p><form id="ground-message-form"><label for="ground-message-text">留言內容</label><textarea id="ground-message-text" name="message" required maxlength="600" rows="4" placeholder="例如：前方有不用排隊的洗手間，右轉就到了。"></textarea><label for="ground-message-hours">保留時間</label><select id="ground-message-hours" name="hours"><option value="2">2 小時</option><option value="6">6 小時</option><option value="24" selected>24 小時</option></select><div class="coordinate-note"><strong>留言位置：目前所在位置</strong><p id="ground-message-position" role="status" aria-live="polite">正在取得 GPS 定位…</p><button type="button" id="ground-message-gps">重新取得目前位置</button></div><p class="field-note">只發布這一個位置，不會因此開啟持續定位。留言到期會隱藏；本人或隊長可提前刪除。無效票多於有效票時會自動移除，評價紀錄保留。</p><div class="form-error" role="alert"></div><button type="submit" class="button primary full">留下留言</button></form>');
+    actions.dialog({kind:'ground'});
     const form=document.querySelector('#ground-message-form'),status=form.querySelector('#ground-message-position'),gps=form.querySelector('#ground-message-gps');
     let point=null,pending=null;
     const current=()=>form.isConnected&&document.querySelector('#dialog').open&&actions.context()?.room===context.room&&actions.context()?.user===context.user;

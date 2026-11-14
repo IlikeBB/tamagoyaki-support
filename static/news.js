@@ -21,19 +21,7 @@ class NewsBoard {
     invitationSection.hidden=!owner||!['all','friends'].includes(filter)||(!incoming.length&&!friendError&&!syncError&&filter!=='friends');
     root.querySelector('#news-invitation-status').textContent=friendError||syncError;
     const key=JSON.stringify([owner,incoming,[...busy],syncError]);if(key===friendKey)return;friendKey=key;
-    invitationList.replaceChildren();
-    for(const person of incoming){
-      const card=element('article','news-invite'),identity=element('div','news-invite-person'),portrait=element('span','news-invite-avatar',[...(person.nickname||'夥伴')][0]);
-      if(person.avatar_url){const image=element('img');image.src=person.avatar_url;image.alt='';image.onerror=()=>image.remove();portrait.append(image);}
-      const name=element('div');name.append(element('strong','',person.nickname),element('small','','@'+person.username));identity.append(portrait,name);
-      const buttons=element('div','news-invite-actions');
-      for(const [response,label] of [['accept','接受邀請'],['reject','拒絕']]){
-        const button=element('button',response==='accept'?'button secondary':'button outline',label);button.type='button';
-        button.dataset.newsInvite=person.id;button.dataset.newsResponse=response;button.disabled=busy.has(person.id)||!!syncError;buttons.append(button);
-      }
-      card.append(identity,element('p','','想邀請你成為好友。'),buttons);invitationList.append(card);
-    }
-    if(!incoming.length)invitationList.append(element('p','news-empty','目前沒有待處理的好友邀請。'));
+    TamagoVue.renderList(invitationList,'invitations',{items:incoming,busy:[...busy],error:syncError});
   }
   async function respond(id,response){
     if(busy.has(id)||!incoming.some(person=>person.id===id)||owner!==actions.user()?.id)return;
@@ -59,28 +47,11 @@ class NewsBoard {
     status.textContent=filter==='friends'?`${incoming.length} 份待處理好友邀請`:error||(loading?'正在載入公告…':`共 ${entries.length} 則公告`);
     for(const button of root.querySelectorAll('[data-news-filter]'))button.setAttribute('aria-pressed',String(button.dataset.newsFilter===filter));
     renderInvitations();
-    list.replaceChildren();
     const visible=entries.filter(item=>filter==='all'||item.type===filter);
-    for(const item of visible){
-      const article=element('article','news-item'),meta=element('div','news-item-meta');
-      meta.append(element('span','news-tag '+item.type,labels[item.type]));
-      const time=element('time','',item.published_at.replaceAll('-',' / '));time.dateTime=item.published_at;meta.append(time);
-      if(!read.has(revision(item)))meta.append(element('span','news-new','新公告'));
-      article.append(meta,element('h3','',item.title));
-      if(item.type==='event'&&validDate(item.event_date))article.append(element('p','news-event-date','活動日期 · '+item.event_date));
-      for(const paragraph of item.body)article.append(element('p','',paragraph));
-      if(item.link&&typeof item.link.url==='string'){
-        try{
-          const url=new URL(item.link.url,location.origin);
-          if(url.protocol==='https:'||(url.origin===location.origin&&url.protocol==='http:')){
-            const link=element('a','news-link',typeof item.link.label==='string'?item.link.label:'查看詳情');
-            link.href=url.href;link.target='_blank';link.rel='noopener noreferrer';article.append(link);
-          }
-        }catch{}
-      }
-      list.append(article);
-    }
-    if(filter!=='friends'&&!visible.length&&!loading&&!error)list.append(element('p','news-empty',filter==='event'?'目前沒有活動公告，有新活動時會在這裡公布。':filter==='update'?'目前沒有網站更新公告。':'目前沒有公告，有新消息時會在這裡公布。'));
+    TamagoVue.renderList(list,'news',{items:visible.map(item=>{
+      let safeLink=null;try{const url=new URL(item.link?.url,location.origin);if(item.link?.url&&(url.protocol==='https:'||(url.origin===location.origin&&url.protocol==='http:')))safeLink=url.href;}catch{}
+      return {...item,unread:!read.has(revision(item)),eventDate:item.type==='event'&&validDate(item.event_date),safeLink};
+    }),empty:filter!=='friends'&&!visible.length&&!loading&&!error?(filter==='event'?'目前沒有活動公告，有新活動時會在這裡公布。':filter==='update'?'目前沒有網站更新公告。':'目前沒有公告，有新消息時會在這裡公布。'):''});
     if(root.open&&!loading){
       for(const item of visible)read.add(revision(item));
       read=new Set([...read].slice(-200));

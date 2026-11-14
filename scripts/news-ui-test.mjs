@@ -1,5 +1,5 @@
 import {chromium,expect} from '@playwright/test';
-const origin=process.argv.includes('--public')?'https://tamagoyaki-support.modoubletw.com':'http://127.0.0.1:8078';
+const origin=process.env.QA_ORIGIN||(process.argv.includes('--public')?'https://tamagoyaki-support.modoubletw.com':'http://127.0.0.1:8078');
 const browser=await chromium.launch({headless:true,executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'});
 const errors=[],writes=[],checks=[];
 try{

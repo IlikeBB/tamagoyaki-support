@@ -7,7 +7,7 @@ class RoomAdmission {
     catch(error){if(error.status!==428)throw error;}
     if(this.actions.user()?.id!==uid)return;
     this.finish?.();this.uid=uid;
-    this.actions.dialog('<h2>輸入遠征隊密碼</h2><form id="room-admission-form"><label for="room-admission-password">加入密碼</label><input id="room-admission-password" name="password" type="password" required maxlength="128" autocomplete="off"><p class="form-error" role="alert"></p><button class="button primary full" type="submit">加入遠征隊</button></form>');
+    this.actions.dialog({kind:'admission'});
     this.form=document.querySelector('#room-admission-form');const form=this.form,dialog=document.querySelector('#dialog');
     return new Promise(resolve=>{
       let settled=false;const done=room=>{if(settled)return;settled=true;dialog.removeEventListener('close',closed);this.finish=null;this.uid=null;this.form=null;resolve(room);},closed=()=>done();this.finish=()=>done();dialog.addEventListener('close',closed);
