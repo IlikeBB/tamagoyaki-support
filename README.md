@@ -1,12 +1,13 @@
 # 玉子燒支援隊 · Tamagoyaki Support
 
-手機優先的遠征會合網頁。Python FastAPI、SQLite，前端使用原生 JavaScript 與自架 Leaflet 1.9.4。正式網址：https://tamagoyaki-support.modoubletw.com/
+手機優先的遠征會合網頁。Python FastAPI、SQLite，遠征隊頁面使用 Vue 3，其餘前端沿用原生 JavaScript；底圖支援 Google Maps 與自架 Leaflet 1.9.4。正式網址：https://tamagoyaki-support.modoubletw.com/
 
 ## 專案結構
 
 - `backend/`：Python 後端、資料存取與啟動入口。
 - `tests/`：Python 單元與整合測試。
 - `static/`：網頁介面、樣式、圖示及地圖資源。
+- `frontend/`：Vue 單檔元件、遠征隊頁面與 Vite 建置設定。
 - `scripts/`：部署腳本與瀏覽器驗證工具。
 - `assets/`：地圖原始素材。
 
@@ -180,6 +181,32 @@ iPhone／iPad 主畫面模式（`navigator.standalone`）使用 `100vh` 作為�
 底圖使用官方 Maps JavaScript API，保留 Google 署名，幕張場館覆蓋圖沿用既有座標，地圖不設場館範圍限制。金鑰缺失時使用 OpenStreetMap；Google 連線或授權失敗時會顯示提示並切回 OpenStreetMap。隔離 QA 伺服器可設定 `TAMAGO_MAP_PROVIDER=leaflet`，避免使用正式金鑰或依賴外部地圖授權。
 
 ## 驗證
+
+### Vue 前端建置
+
+`vue-version` 分支先將遠征隊頁面改為 Vue 元件，沿用原有 API、驗證及導覽；地圖、聊天等介面仍由既有程式管理。Vue 的入口是 `frontend/expeditions-page.js`，元件放在 `frontend/components/`。
+
+修改 Vue 原始碼後執行：
+
+```powershell
+npm ci --ignore-scripts
+npm run build
+```
+
+建置會產生 `static/vue/expeditions-page.js`、第三方授權檔，並依內容雜湊更新 `static/index.html` 的載入版本。這些建置產物須與原始碼一起提交。Python 部署可直接服務已建置的檔案，執行時不需要 Node.js。Vue 模板在建置時編譯，沿用既有 CSP，不加入 `unsafe-eval`。
+
+在使用獨立資料庫的 `http://127.0.0.1:8079` 伺服器驗證 Vue 版：
+
+```powershell
+$env:QA_ORIGIN = 'http://127.0.0.1:8079'
+node scripts/expeditions-page-preview.mjs http://127.0.0.1:8079
+node scripts/expeditions-page-test.mjs
+node scripts/expeditions-vue-test.mjs
+```
+
+涵蓋建立／加入、成員預覽、日期區間、失敗重試、場館請求競態、帳號切換、搜尋與鍵盤焦點、CSP，以及手機／桌機與黑夜模式。會註冊帳號或變更成員的測試僅可對隔離 QA 環境執行。
+
+### 功能驗證
 
 任務類型包含「聚餐」。選取「求助」時須先取得 GPS，發布後以紅色驚嘆號顯示發布者的即時位置，求助所在遠征隊的所有成員皆可查看，不必接取；不會擴及其他遠征隊或僅有好友關係的人。求助持續到發布者按「刪除求助」，沒有一般任務的到期時間；多個求助須刪除最後一個才停止持續定位。切換隊伍與重新整理會恢復求助定位；定位暫時失效時保留最後位置 15 分鐘並重試；2–15 分鐘標示最後位置，滿 15 分鐘未更新後隱藏。拒絕權限會立即撤回座標，須手動開啟，退出該隊或登出也會撤回位置。既有未同意廣播的舊任務不會因更新擴大位置權限。
 
