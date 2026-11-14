@@ -1,6 +1,6 @@
 # 玉子燒支援隊 · Tamagoyaki Support
 
-手機優先的遠征會合網頁。Python FastAPI、SQLite，遠征隊頁面使用 Vue 3，其餘前端沿用原生 JavaScript；底圖支援 Google Maps 與自架 Leaflet 1.9.4。正式網址：https://tamagoyaki-support.modoubletw.com/
+手機優先的遠征會合網頁。Python FastAPI、SQLite，遠征隊頁面與聊天介面使用 Vue 3，其餘前端沿用原生 JavaScript；底圖支援 Google Maps 與自架 Leaflet 1.9.4。正式網址：https://tamagoyaki-support.modoubletw.com/
 
 ## 專案結構
 
@@ -184,7 +184,7 @@ iPhone／iPad 主畫面模式（`navigator.standalone`）使用 `100vh` 作為�
 
 ### Vue 前端建置
 
-`vue-version` 分支先將遠征隊頁面改為 Vue 元件，沿用原有 API、驗證及導覽；地圖、聊天等介面仍由既有程式管理。Vue 的入口是 `frontend/expeditions-page.js`，元件放在 `frontend/components/`。
+`vue-version` 分支已將遠征隊頁面與聊天介面改為 Vue 元件，沿用原有 API、驗證及導覽。共用入口為 `frontend/main.js`，元件放在 `frontend/components/`；`frontend/expeditions-page.js` 與 `frontend/chat-view.js` 負責和既有程式銜接。聊天的權限、同步、去重傳送與草稿管理仍由 `static/chat.js` 負責，Vue 接手對話列表、頭貼、訊息與輸入區；訊息更新等待 Vue 完成繪製後再計算捲動及已讀。
 
 修改 Vue 原始碼後執行：
 
@@ -193,7 +193,7 @@ npm ci --ignore-scripts
 npm run build
 ```
 
-建置會產生 `static/vue/expeditions-page.js`、第三方授權檔，並依內容雜湊更新 `static/index.html` 的載入版本。這些建置產物須與原始碼一起提交。Python 部署可直接服務已建置的檔案，執行時不需要 Node.js。Vue 模板在建置時編譯，沿用既有 CSP，不加入 `unsafe-eval`。
+建置會產生 `static/vue/app.js`、第三方授權檔，並依內容雜湊更新 `static/index.html` 的載入版本。頁面與聊天共用同一份 Vue runtime。這些建置產物須與原始碼一起提交。Python 部署可直接服務已建置的檔案，執行時不需要 Node.js。Vue 模板在建置時編譯，沿用既有 CSP，不加入 `unsafe-eval`。
 
 在使用獨立資料庫的 `http://127.0.0.1:8079` 伺服器驗證 Vue 版：
 
@@ -202,9 +202,15 @@ $env:QA_ORIGIN = 'http://127.0.0.1:8079'
 node scripts/expeditions-page-preview.mjs http://127.0.0.1:8079
 node scripts/expeditions-page-test.mjs
 node scripts/expeditions-vue-test.mjs
+node scripts/chat-test.mjs
+node scripts/chat-vue-test.mjs
+node scripts/squad-chat-test.mjs
+node scripts/chat-avatars-test.mjs
+node scripts/chat-friend-news-test.mjs
+node scripts/squad-friend-invites-test.mjs
 ```
 
-涵蓋建立／加入、成員預覽、日期區間、失敗重試、場館請求競態、帳號切換、搜尋與鍵盤焦點、CSP，以及手機／桌機與黑夜模式。會註冊帳號或變更成員的測試僅可對隔離 QA 環境執行。
+涵蓋建立／加入、成員預覽、日期區間、失敗重試、場館請求競態、帳號切換、搜尋與鍵盤焦點、CSP，以及手機／桌機與黑夜模式。聊天另驗證私訊／遠征隊／小隊權限、傳送重試去重、草稿與頭貼、歷史捲動位置、已讀、輸入法組字、禁言、離線與好友／小隊邀請。會註冊帳號或變更成員的測試僅可對隔離 QA 環境執行。
 
 ### 功能驗證
 

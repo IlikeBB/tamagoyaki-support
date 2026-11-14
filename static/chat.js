@@ -2,7 +2,7 @@
 class ChatClient {
   constructor(root,actions){
     this.actions=actions;this.root=root;this.owner=null;this.generation=0;this.selection=0;this.contacts=[];this.messages=[];this.drafts=new Map();this.retryMessages=new Map();
-    this.view=new ChatView(root,{choose:key=>this.choose(key),person:id=>{if(id!==this.owner&&(this.active?.kind==='friend'&&this.active.target===id||this.messages.some(m=>m.sender===id)))this.actions.person(id);},send:()=>this.send(),draft:text=>{if(this.active)this.drafts.set(this.active.id,text);},read:()=>this.markRead(),older:()=>this.loadOlder(),retry:()=>this.tick(),back:()=>this.back(),closed:()=>this.back()});
+    this.view=new TamagoVue.ChatView(root,{choose:key=>this.choose(key),person:id=>{if(id!==this.owner&&(this.active?.kind==='friend'&&this.active.target===id||this.messages.some(m=>m.sender===id)))this.actions.person(id);},invitation:body=>this.actions.invitation(body),send:()=>this.send(),draft:text=>{if(this.active)this.drafts.set(this.active.id,text);},read:()=>this.markRead(),older:()=>this.loadOlder(),retry:()=>this.tick(),back:()=>this.back(),closed:()=>this.back()});
     for(const name of ['online','offline'])window.addEventListener(name,()=>{this.view.composer(this.sending);if(navigator.onLine)this.tick();else this.view.status('離線 · 連線後重新同步');});
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)this.tick();});
   }
@@ -59,7 +59,7 @@ class ChatClient {
       const ids=new Set(this.messages.map(m=>m.id));this.messages.push(...data.messages.filter(m=>!ids.has(m.id)));this.messages.sort((a,b)=>a.id-b.id);
       this.cursor=data.messages.at(-1)?.id||this.cursor;
       if(initial)this.hasOlder=data.has_more;
-      this.view.messages(this.messages,this.owner,{initial,hasOlder:this.hasOlder});this.view.error();this.markRead();return !initial&&data.has_more;
+      await this.view.messages(this.messages,this.owner,{initial,hasOlder:this.hasOlder});if(generation!==this.generation||selection!==this.selection)return;this.view.error();this.markRead();return !initial&&data.has_more;
     }catch(error){
       if(generation===this.generation&&selection===this.selection){if(error.status===403){this.back();this.sync();}else this.handle(error,generation);}
     }finally{if(generation===this.generation&&selection===this.selection)this.fetching=false;}
@@ -70,7 +70,7 @@ class ChatClient {
     try{
       const data=await this.actions.api(this.endpoint()+`/messages?before=${this.messages[0].id}`);
       if(generation!==this.generation||selection!==this.selection)return;
-      this.messages.unshift(...data.messages);this.hasOlder=data.has_more;this.view.messages(this.messages,this.owner,{prepend:true,hasOlder:this.hasOlder});
+      this.messages.unshift(...data.messages);this.hasOlder=data.has_more;await this.view.messages(this.messages,this.owner,{prepend:true,hasOlder:this.hasOlder});
     }catch(error){if(selection===this.selection)this.handle(error,generation);}
     finally{if(generation===this.generation&&selection===this.selection)this.fetching=false;}
   }
@@ -96,8 +96,8 @@ class ChatClient {
       if(generation!==this.generation)return;
       if(this.drafts.get(contact.id)?.trim()===body)this.drafts.delete(contact.id);this.retryMessages.delete(contact.id);
       if(selection===this.selection){
-        if(this.view.input.value===value)this.view.input.value='';if(!this.messages.some(m=>m.id===message.id))this.messages.push(message);this.messages.sort((a,b)=>a.id-b.id);
-        this.view.messages(this.messages,this.owner,{initial:true,hasOlder:this.hasOlder});await this.fetchMessages();
+        this.view.clearDraft(value);if(!this.messages.some(m=>m.id===message.id))this.messages.push(message);this.messages.sort((a,b)=>a.id-b.id);
+        await this.view.messages(this.messages,this.owner,{initial:true,hasOlder:this.hasOlder});if(generation!==this.generation)return;if(selection===this.selection)await this.fetchMessages();
       }
       await this.sync();
     }catch(error){if(generation===this.generation&&selection===this.selection){if(error.status===403){this.back();this.sync();}else this.handle(error,generation);}}

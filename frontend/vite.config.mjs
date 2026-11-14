@@ -16,10 +16,10 @@ export default defineConfig({
     target: 'es2020',
     sourcemap: false,
     lib: {
-      entry: fileURLToPath(new URL('./expeditions-page.js', import.meta.url)),
-      name: 'TamagoExpeditions',
+      entry: fileURLToPath(new URL('./main.js', import.meta.url)),
+      name: 'TamagoVue',
       formats: ['iife'],
-      fileName: () => 'expeditions-page.js',
+      fileName: () => 'app.js',
     },
   },
 });

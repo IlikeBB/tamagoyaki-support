@@ -917,7 +917,7 @@ async function init(){
   expeditionPreview=new ExpeditionPreview({api,dialog,person:(eid,pid)=>memberActions.open(eid,pid),user:()=>state.authenticated?state.user:null,login:()=>{authIntent={kind:'expeditions-page',mode:'browse'};showAuth();},join:async(id,uid)=>{const room=await roomAdmission.join(id,uid);if(room&&state.authenticated&&state.user.id===uid)await finishRoomJoin(room,false);}});
   siteAccountAdmin=new SiteAccountAdmin({api,dialog,toast,user:()=>state.authenticated?state.user:null});
   expeditionManagement=new ExpeditionMemberManagement({api,dialog,toast,user:()=>state.authenticated?state.user:null,changed:async(uid,renamed)=>{const me=await api('/me');if(state.authenticated&&state.user.id===uid){state.rooms=me.expeditions;if(renamed)expeditionPage?.rename(renamed);if(!state.demo)await refresh({fresh:true});render();if(renamed)chat?.tick();}}});
-  expeditionPage=new TamagoExpeditions.ExpeditionsPage($('#expeditions-page'),{
+  expeditionPage=new TamagoVue.ExpeditionsPage($('#expeditions-page'),{
     api,toast,schedule:activitySchedule,preview:room=>expeditionPreview.open(room),manage:room=>roomSettings.open(room),context:()=>({user:state.authenticated?state.user:null,rooms:state.rooms,current:state.demo?null:state.room.id,venues:config?activityVenues():[],venue:config?activityVenue():null}),
     rooms:rooms=>{state.rooms=rooms;},create:vid=>{state.activityVenue=vid;showJoin('create');},expired:()=>friends?.actions.expired(),back:showMap,
     login:()=>{authIntent={kind:'expeditions-page',mode:expeditionPage.mode};showAuth();},
@@ -944,7 +944,7 @@ async function init(){
   taskFeedback=new TaskFeedback({api,toast,context:()=>({eid:state.room.id,user:state.user.id,tasks:state.tasks}),committed:()=>{taskRevision++;},changed:()=>render()});
   squadInvites=new SquadInvites({api,context:()=>!state.demo&&state.authenticated&&currentSquad()?{user:state.user.id,eid:state.room.id,sid:state.mine.squad}:null,sent:()=>chat?.tick()});
   appDisplay=new AppDisplay({dialog,close:closeDialog,toast});
-  chat=new ChatClient($('#chat-dialog'),{api,toast,user:()=>state.authenticated?state.user:null,login:()=>{authIntent={kind:'chat'};showAuth();},expired:()=>friends?.actions.expired(),person:id=>chatFriend.open(id)});
+  chat=new ChatClient($('#chat-dialog'),{api,toast,user:()=>state.authenticated?state.user:null,login:()=>{authIntent={kind:'chat'};showAuth();},expired:()=>friends?.actions.expired(),person:id=>chatFriend.open(id),invitation:body=>SquadInvites.invitationURL(body,location.origin,config?.public_origin)});
   mapActions=new MapActions($('#map'),$('#map-actions'),{
     pointAt:(x,y)=>{
       if(!map)return null;
